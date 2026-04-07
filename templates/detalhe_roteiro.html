@@ -1,0 +1,276 @@
+{% extends 'base.html' %}
+{% block title %}{{ roteiro.titulo }} — GeoRota{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+#mapa-roteiro { height: 380px; border-radius: 14px; }
+#mini-mapa    { height: 190px; border-radius: 10px; margin-bottom: .9rem; }
+.search-result-item {
+    padding: .5rem .8rem; border-radius: 8px; cursor: pointer;
+    font-size: .85rem; color: var(--text); transition: background .15s;
+    border: 1px solid var(--border); margin-bottom: .3rem;
+    background: var(--bg);
+}
+.search-result-item:hover { background: var(--green-light); border-color: var(--green); }
+.waypoint-remove {
+    background: none; border: none; color: var(--text-muted);
+    cursor: pointer; font-size: 1rem; padding: .2rem .4rem;
+    border-radius: 6px; transition: background .15s, color .15s;
+}
+.waypoint-remove:hover { background: #fee2e2; color: var(--red); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="detalhe-wrapper">
+
+    <!-- COVER -->
+    <div class="detalhe-cover">🗺️</div>
+
+    <!-- HEADER -->
+    <h1 class="detalhe-title">Detalhes do Roteiro: {{ roteiro.titulo }}</h1>
+    <p class="detalhe-meta">
+        Criado em {{ roteiro.data_criacao|date:"d/m/Y" }} · {{ roteiro.dias.count }} dia(s)
+        {% if roteiro.descricao %} · {{ roteiro.descricao|truncatechars:60 }}{% endif %}
+    </p>
+
+    <div class="detalhe-actions">
+        <a href="{% url 'editar_roteiro' roteiro.pk %}" class="btn-outline">✏️ Editar Roteiro</a>
+        <a href="{% url 'mapa' %}" class="btn-primary">🗺️ Ver no Mapa</a>
+        <a href="{% url 'eliminar_roteiro' roteiro.pk %}" class="btn-danger">🗑️ Eliminar</a>
+    </div>
+
+    <!-- ADICIONAR DIA -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem; flex-wrap:wrap; gap:.6rem;">
+        <h2 style="font-family:var(--font-display); font-size:1.1rem; color:var(--text);">📅 Dias do Roteiro</h2>
+        <form method="post" action="{% url 'adicionar_dia' roteiro.pk %}" style="display:flex; gap:.5rem;">
+            {% csrf_token %}
+            <input type="text" name="titulo" placeholder="Nome do dia (opcional)"
+                   style="padding:.5rem .9rem; border:1.5px solid var(--border); border-radius:var(--radius);
+                          background:var(--white); font-family:var(--font-body); font-size:.85rem; color:var(--text);">
+            <button type="submit" class="btn-primary btn-sm">+ Dia</button>
+        </form>
+    </div>
+
+    <!-- DIAS -->
+    {% for dia in roteiro.dias.all %}
+    <div class="dia-accordion">
+        <div class="dia-accordion-header">
+            <h3>Dia {{ dia.numero }}{% if dia.titulo %} — {{ dia.titulo }}{% endif %}</h3>
+            <button class="btn-primary btn-sm" onclick="abrirModalLocal({{ dia.pk }})">
+                + Adicionar Local
+            </button>
+        </div>
+        <div class="dia-accordion-body">
+            {% for local in dia.locais.all %}
+            <div class="local-item">
+                <span class="local-emoji">
+                    {% if local.tipo == 'turismo' %}🏛
+                    {% elif local.tipo == 'restaurante' %}🍽
+                    {% elif local.tipo == 'hotel' %}🏨
+                    {% elif local.tipo == 'hospital' %}🏥
+                    {% elif local.tipo == 'farmacia' %}💊
+                    {% elif local.tipo == 'carregador' %}⚡
+                    {% else %}📍{% endif %}
+                </span>
+                <div class="local-info">
+                    <strong>{{ local.nome }}</strong>
+                    <span class="local-tipo-badge">{{ local.get_tipo_display }}</span>
+                    {% if local.notas %}<small>{{ local.notas }}</small>{% endif %}
+                    <small style="display:block; color:var(--text-muted); margin-top:.2rem;">
+                        📍 {{ local.latitude|floatformat:4 }}, {{ local.longitude|floatformat:4 }}
+                    </small>
+                </div>
+                <form method="post" action="{% url 'remover_local' local.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="waypoint-remove" title="Remover">✕</button>
+                </form>
+            </div>
+            {% empty %}
+            <p class="empty-msg">Nenhum local adicionado. Clica em "+ Adicionar Local".</p>
+            {% endfor %}
+        </div>
+    </div>
+    {% empty %}
+    <div class="empty-state" style="padding:2.5rem 1.5rem;">
+        <div class="empty-icon">📅</div>
+        <h3>Ainda não há dias</h3>
+        <p>Usa o formulário acima para adicionar o primeiro dia.</p>
+    </div>
+    {% endfor %}
+
+    <!-- MAPA DO ROTEIRO -->
+    {% if roteiro.dias.count %}
+    <div style="display:flex; justify-content:space-between; align-items:center; margin:2rem 0 1rem; flex-wrap:wrap; gap:.5rem;">
+        <h2 style="font-family:var(--font-display); font-size:1.1rem; color:var(--text);">🗺️ Mapa do Roteiro</h2>
+        <a href="{% url 'mapa' %}" class="btn-outline btn-sm">Abrir Mapa Completo</a>
+    </div>
+    <div id="mapa-roteiro"></div>
+    {% endif %}
+
+</div>
+
+<!-- MODAL ADICIONAR LOCAL -->
+<div class="modal-overlay" id="modalLocal">
+    <div class="modal">
+        <button class="modal-close" onclick="fecharModal()">✕</button>
+        <h3>📍 Adicionar Local</h3>
+        <form method="post" id="formLocal">
+            {% csrf_token %}
+
+            <!-- Pesquisa -->
+            <div class="form-group">
+                <label>Pesquisar local</label>
+                <div style="display:flex; gap:.5rem;">
+                    <input type="text" id="modalSearch" placeholder="ex: Torre de Belém, Lisboa"
+                           style="flex:1; padding:.65rem 1rem; border:1.5px solid var(--border);
+                                  border-radius:var(--radius); background:#f0f5f4;
+                                  font-family:var(--font-body); font-size:.9rem;">
+                    <button type="button" class="btn-primary btn-sm" onclick="pesquisarModal()">🔍</button>
+                </div>
+                <div id="modalResults" style="margin-top:.5rem;"></div>
+            </div>
+
+            <div id="mini-mapa"></div>
+
+            <div class="form-group">
+                <label>Nome do Local</label>
+                <input type="text" name="nome" id="localNome" required placeholder="Nome do local">
+            </div>
+            <div class="form-group">
+                <label>Tipo</label>
+                <select name="tipo">
+                    <option value="turismo">🏛 Turismo</option>
+                    <option value="restaurante">🍽 Restaurante</option>
+                    <option value="hotel">🏨 Hotel</option>
+                    <option value="hospital">🏥 Hospital</option>
+                    <option value="farmacia">💊 Farmácia</option>
+                    <option value="carregador">⚡ Carregador Elétrico</option>
+                    <option value="outro">📍 Outro</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Notas (opcional)</label>
+                <textarea name="notas" rows="2" placeholder="Observações..."></textarea>
+            </div>
+            <input type="hidden" name="latitude"  id="localLat">
+            <input type="hidden" name="longitude" id="localLng">
+
+            <div style="display:flex; gap:.7rem; margin-top:1rem;">
+                <button type="submit" class="btn-primary" id="btnGuardarLocal" disabled>Guardar Local</button>
+                <button type="button" class="btn-outline" onclick="fecharModal()">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const API_KEY = "{{ api_key }}";
+const locais  = {{ locais_json|safe }};
+
+/* ── MAPA ROTEIRO ── */
+{% if roteiro.dias.count %}
+const mapaRoteiro = L.map('mapa-roteiro').setView([39.7, -8.0], 6);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© OpenStreetMap'
+}).addTo(mapaRoteiro);
+
+if (locais.length > 0) {
+    const cores = ['#2a7c6f','#3b82f6','#f97316','#a855f7','#ef4444'];
+    const bounds = [];
+    locais.forEach(l => {
+        const icon = L.divIcon({
+            className:'',
+            html:`<div style="background:${cores[l.dia % cores.length]};color:#fff;
+                       width:28px;height:28px;border-radius:50%;display:flex;
+                       align-items:center;justify-content:center;font-weight:700;
+                       font-size:.72rem;box-shadow:0 2px 6px rgba(0,0,0,.35);
+                       border:2px solid #fff">${l.dia}</div>`,
+            iconSize:[28,28], iconAnchor:[14,14]
+        });
+        L.marker([l.lat,l.lng],{icon})
+         .addTo(mapaRoteiro)
+         .bindPopup(`<b>${l.nome}</b><br><small>Dia ${l.dia}</small>`);
+        bounds.push([l.lat,l.lng]);
+    });
+    mapaRoteiro.fitBounds(bounds,{padding:[30,30]});
+    if (locais.length > 1) {
+        L.polyline(locais.map(l=>[l.lat,l.lng]),{
+            color:'#2a7c6f', weight:3, dashArray:'6,5', opacity:.75
+        }).addTo(mapaRoteiro);
+    }
+}
+{% endif %}
+
+/* ── MODAL ── */
+let miniMapa    = null;
+let miniMarker  = null;
+let diaPkAtual  = null;
+
+function abrirModalLocal(diaPk) {
+    diaPkAtual = diaPk;
+    document.getElementById('formLocal').action = `/dia/${diaPk}/adicionar-local/`;
+    document.getElementById('modalLocal').classList.add('open');
+    document.getElementById('btnGuardarLocal').disabled = true;
+    document.getElementById('localLat').value  = '';
+    document.getElementById('localLng').value  = '';
+    document.getElementById('localNome').value = '';
+    document.getElementById('modalResults').innerHTML = '';
+    setTimeout(() => {
+        if (!miniMapa) {
+            miniMapa = L.map('mini-mapa').setView([39.7,-8.0],6);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(miniMapa);
+            miniMapa.on('click', e => selecionarCoordenadas(e.latlng.lat, e.latlng.lng, 'Local selecionado'));
+        } else {
+            miniMapa.invalidateSize();
+        }
+    }, 100);
+}
+
+function fecharModal() {
+    document.getElementById('modalLocal').classList.remove('open');
+}
+
+async function pesquisarModal() {
+    const q = document.getElementById('modalSearch').value.trim();
+    if (!q) return;
+    const res  = await fetch(`https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(q)}&lang=pt&limit=5&apiKey=${API_KEY}`);
+    const data = await res.json();
+    const feats = data.features || [];
+    const cont  = document.getElementById('modalResults');
+    cont.innerHTML = feats.map(f => {
+        const nome = f.properties.name || f.properties.formatted;
+        const [lng,lat] = f.geometry.coordinates;
+        return `<div class="search-result-item"
+                    onclick="selecionarCoordenadas(${lat},${lng},'${nome.replace(/'/g,"\\'")}')">
+                    📍 ${nome}
+                </div>`;
+    }).join('') || '<p style="color:var(--text-muted);font-size:.83rem;padding:.4rem">Nenhum resultado.</p>';
+}
+
+function selecionarCoordenadas(lat,lng,nome) {
+    document.getElementById('localLat').value = lat;
+    document.getElementById('localLng').value = lng;
+    if (!document.getElementById('localNome').value)
+        document.getElementById('localNome').value = nome;
+    document.getElementById('btnGuardarLocal').disabled = false;
+    document.getElementById('modalResults').innerHTML = '';
+    if (miniMapa) {
+        miniMapa.setView([lat,lng],14);
+        if (miniMarker) miniMapa.removeLayer(miniMarker);
+        miniMarker = L.marker([lat,lng]).addTo(miniMapa).bindPopup(nome).openPopup();
+    }
+}
+
+document.getElementById('modalSearch').addEventListener('keypress', e => {
+    if (e.key==='Enter') { e.preventDefault(); pesquisarModal(); }
+});
+document.getElementById('modalLocal').addEventListener('click', function(e){
+    if (e.target===this) fecharModal();
+});
+</script>
+{% endblock %}

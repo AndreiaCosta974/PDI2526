@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}Entrar — GeoRota{% endblock %}
+
+{% block content %}
+<div class="auth-bg">
+    <div class="auth-card">
+        <h2 class="auth-card-title">Entrar na sua conta GeoRota</h2>
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label>Email ou Utilizador</label>
+                <input type="text" name="username" placeholder="utilizador@email.com" required autocomplete="username">
+            </div>
+            <div class="form-group">
+                <label>Palavra-passe</label>
+                <input type="password" name="password" id="pass-input" placeholder="••••••••" required autocomplete="current-password">
+            </div>
+            <div class="show-pass-row">
+                <input type="checkbox" id="show-pass" onchange="document.getElementById('pass-input').type=this.checked?'text':'password'">
+                <label for="show-pass">Mostrar palavra-passe</label>
+            </div>
+            {% if form.errors %}
+                <p class="form-error">Utilizador ou palavra-passe incorretos.</p>
+            {% endif %}
+            <button type="submit" class="btn-primary btn-full" style="margin-top:.5rem;">Entrar</button>
+            <a href="#" class="forgot-link">Esqueceu-se da palavra-passe?</a>
+        </form>
+        <p class="auth-switch">Não tem conta? <a href="{% url 'register' %}">Criar conta</a></p>
+    </div>
+</div>
+{% endblock %}

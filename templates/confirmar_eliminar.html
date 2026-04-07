@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block title %}Confirmar Eliminação — GeoRota{% endblock %}
+
+{% block content %}
+<div class="confirm-wrapper">
+    <div class="confirm-card">
+        <div class="confirm-icon">🗑️</div>
+        <h2>Eliminar Roteiro</h2>
+        <p>Tens a certeza que queres eliminar <strong>{{ roteiro.titulo }}</strong>? Esta ação não pode ser desfeita.</p>
+        <div class="confirm-actions">
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn-danger">Eliminar</button>
+            </form>
+            <a href="{% url 'detalhe_roteiro' roteiro.pk %}" class="btn-outline">Cancelar</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
