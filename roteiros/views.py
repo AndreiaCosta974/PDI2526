@@ -17,7 +17,7 @@ def criar_roteiro(request):
             descricao=descricao
         )
         messages.success(request, 'Roteiro criado!')
-        return redirect('detalhe_roteiro', pk=roteiro.pk)
+        return redirect('dashboard')
     return render(request, 'criar_roteiro.html')
 
 @login_required
@@ -90,10 +90,60 @@ def adicionar_local(request, dia_pk):
         messages.success(request, 'Local adicionado!')
     return redirect('detalhe_roteiro', pk=dia.roteiro.pk)
 
-@login_required  
+@login_required
 def remover_local(request, local_pk):
     local = get_object_or_404(Local, pk=local_pk, dia__roteiro__utilizador=request.user)
     roteiro_pk = local.dia.roteiro.pk
     local.delete()
     messages.success(request, 'Local removido.')
     return redirect('detalhe_roteiro', pk=roteiro_pk)
+
+@login_required
+def guardar_rota_mapa(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        titulo = data.get('titulo', 'Rota sem título')
+        waypoints = data.get('waypoints', [])
+        roteiro = Roteiro.objects.create(utilizador=request.user, titulo=titulo)
+        dia = Dia.objects.create(roteiro=roteiro, numero=1, titulo='Dia 1')
+        for i, wp in enumerate(waypoints):
+            Local.objects.create(
+                dia=dia,
+                nome=wp.get('nome', f'Ponto {i+1}'),
+                tipo='turismo',
+                latitude=wp['lat'],
+                longitude=wp['lng'],
+                ordem=i+1,
+            )
+        return JsonResponse({'ok': True})
+    return JsonResponse({'ok': False}, status=400)
+
+@login_required
+def guardar_rota_mapa(request):
+    if request.method == 'POST':
+        import json
+        data = json.loads(request.body)
+        titulo = data.get('titulo', 'Rota do Mapa')
+        waypoints = data.get('waypoints', [])
+        distancia = data.get('distancia', '')
+        tempo = data.get('tempo', '')
+
+        descricao = f"Rota criada a partir do mapa. Distância: {distancia}, Tempo estimado: {tempo}."
+        roteiro = Roteiro.objects.create(
+            utilizador=request.user,
+            titulo=titulo,
+            descricao=descricao
+        )
+        dia = Dia.objects.create(roteiro=roteiro, numero=1, titulo='Dia 1')
+        for i, wp in enumerate(waypoints):
+            Local.objects.create(
+                dia=dia,
+                nome=wp.get('nome', f'Ponto {i+1}'),
+                tipo='turismo',
+                latitude=wp['lat'],
+                longitude=wp['lng'],
+                notas='',
+                ordem=i + 1
+            )
+        return JsonResponse({'ok': True, 'roteiro_pk': roteiro.pk})
+    return JsonResponse({'ok': False}, status=400)

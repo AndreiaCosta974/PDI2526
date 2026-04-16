@@ -373,9 +373,9 @@ body { overflow: hidden; }
                         <div class="geo-rs-lbl">Tempo estimado</div>
                     </div>
                 </div>
-                <a href="/dashboard/" class="geo-save-route" id="geoSaveRouteBtn">
+                <button class="geo-save-route" id="geoSaveRouteBtn" onclick="geoGuardarRota()">
                     💾 Guardar nos Roteiros
-                </a>
+                </button>
                 <button class="geo-clear-route" onclick="geoClearRoute()">🗑 Limpar rota</button>
             </div>
         </div>
@@ -395,6 +395,20 @@ body { overflow: hidden; }
 </div>
 
 <div id="geo-toast"></div>
+
+<!-- Modal guardar rota -->
+<div id="geoModalGuardar" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9998;align-items:center;justify-content:center;">
+    <div style="background:#1a2a35;border-radius:16px;padding:1.8rem 2rem;min-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.1);">
+        <h3 style="font-family:'Playfair Display',serif;color:#fff;margin:0 0 1rem;font-size:1.15rem;">Guardar Roteiro</h3>
+        <label style="font-family:'DM Sans',sans-serif;font-size:.85rem;color:rgba(255,255,255,.65);display:block;margin-bottom:.4rem;">Nome do roteiro</label>
+        <input id="geoRoteiraTitulo" type="text" placeholder="ex: Fim de semana em Paris"
+            style="width:100%;box-sizing:border-box;padding:.6rem .9rem;border-radius:10px;border:1.5px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;font-family:'DM Sans',sans-serif;font-size:.9rem;outline:none;">
+        <div style="display:flex;gap:.7rem;margin-top:1.2rem;">
+            <button onclick="geoConfirmarGuardar()" style="flex:1;background:#2a7c6f;color:#fff;border:none;border-radius:10px;padding:.65rem;font-family:'DM Sans',sans-serif;font-weight:700;font-size:.9rem;cursor:pointer;">Guardar</button>
+            <button onclick="geoFecharModal()" style="flex:1;background:rgba(255,255,255,.08);color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:.65rem;font-family:'DM Sans',sans-serif;font-size:.9rem;cursor:pointer;">Cancelar</button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -404,9 +418,9 @@ const API_KEY = "{{ api_key }}";
 
 const mapa = L.map('mapa').setView([39.7, -8.0], 7);
 // CartoDB tiles — não bloqueiam localhost
-L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    attribution: '© OpenStreetMap contributors © CARTO',
-    subdomains: 'abcd', maxZoom: 19
+L.tileLayer(`https://maps.geoapify.com/v1/tile/osm-bright/{z}/{x}/{y}.png?apiKey=${API_KEY}&lang=pt`, {
+    attribution: '© OpenStreetMap contributors © Geoapify',
+    maxZoom: 20
 }).addTo(mapa);
 
 let waypoints     = [];
@@ -608,5 +622,51 @@ function geoIconPOI(tipo) {
 function geoIconMinha() { return L.divIcon({className:'',html:'<div style="background:#2a7c6f;width:15px;height:15px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.5)"></div>',iconSize:[15,15],iconAnchor:[7,7]}); }
 
 document.getElementById('geoSearchInput').addEventListener('keypress', e=>{ if(e.key==='Enter') geoPesquisar(); });
+
+function geoGuardarRota() {
+    if (!waypoints.length) { geoToast('Adiciona pontos à rota primeiro.'); return; }
+    const modal = document.getElementById('geoModalGuardar');
+    modal.style.display = 'flex';
+    const inp = document.getElementById('geoRoteiraTitulo');
+    // sugerir nome baseado no primeiro ponto
+    inp.value = waypoints[0]?.nome || '';
+    inp.focus();
+}
+
+function geoFecharModal() {
+    document.getElementById('geoModalGuardar').style.display = 'none';
+}
+
+async function geoConfirmarGuardar() {
+    const titulo = document.getElementById('geoRoteiraTitulo').value.trim();
+    if (!titulo) { document.getElementById('geoRoteiraTitulo').focus(); return; }
+    geoFecharModal();
+    geoLoading(true);
+    try {
+        const res = await fetch('/guardar-rota-mapa/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}',
+            },
+            body: JSON.stringify({ titulo, waypoints }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+            window.location.href = '/dashboard/';
+        } else {
+            geoToast('Erro ao guardar o roteiro.');
+        }
+    } catch {
+        geoToast('Erro de ligação.');
+    } finally {
+        geoLoading(false);
+    }
+}
+
+// fechar modal ao clicar fora
+document.getElementById('geoModalGuardar').addEventListener('click', function(e) {
+    if (e.target === this) geoFecharModal();
+});
 </script>
 {% endblock %}

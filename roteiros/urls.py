@@ -10,4 +10,6 @@ urlpatterns = [
     path('dia/<int:dia_pk>/adicionar-local/', views.adicionar_local, name='adicionar_local'),
     path('local/<int:local_pk>/remover/', views.remover_local, name='remover_local'),
     path('mapa/', views.mapa, name='mapa'),
+    path('guardar-rota-mapa/', views.guardar_rota_mapa, name='guardar_rota_mapa'),
+
 ]
