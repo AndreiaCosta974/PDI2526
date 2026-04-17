@@ -169,19 +169,19 @@
                 <div class="stat-label">Roteiros criados</div>
             </div>
             <div class="stat-card">
-                <img src="{% static 'imgs/icon-carro.png' %}" alt="Viagens" class="stat-icon-img">
-                <div class="stat-value">0</div>
-                <div class="stat-label">Futuras viagens</div>
+                <img src="{% static 'imgs/icon-carro.png' %}" alt="Dias" class="stat-icon-img">
+                <div class="stat-value">{{ total_dias }}</div>
+                <div class="stat-label">Dias planeados</div>
             </div>
             <div class="stat-card">
                 <img src="{% static 'imgs/icon-pin.png' %}" alt="Pontos" class="stat-icon-img">
-                <div class="stat-value">{{ total_locais|default:"—" }}</div>
+                <div class="stat-value">{{ total_locais }}</div>
                 <div class="stat-label">Pontos de interesse marcados</div>
             </div>
             <div class="stat-card">
-                <img src="{% static 'imgs/icon-pdf.png' %}" alt="Próxima" class="stat-icon-img">
-                <div class="stat-value">—</div>
-                <div class="stat-label">Próxima viagem planeada</div>
+                <img src="{% static 'imgs/icon-pdf.png' %}" alt="Último" class="stat-icon-img">
+                <div class="stat-value" style="font-size:1rem;">{{ roteiros.0.data_criacao|date:"d/m/Y"|default:"—" }}</div>
+                <div class="stat-label">Último roteiro criado</div>
             </div>
         </div>
 

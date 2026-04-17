@@ -23,7 +23,6 @@
                 <span style="color:var(--text-muted); font-size:.9rem;">Olá, {{ user.username }}</span>
                 <a href="{% url 'logout' %}" class="btn-outline btn-sm">Sair</a>
             {% else %}
-                <a href="{% url 'mapa' %}">Mapa</a>
                 <a href="{% url 'login' %}" class="btn-outline btn-sm">Entrar</a>
             {% endif %}
         </div>

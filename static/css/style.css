@@ -102,6 +102,10 @@ body {
 .hero-bg-img {
     position: absolute; inset: 0;
     background: linear-gradient(135deg, #1e5f55 0%, #2a7c6f 40%, #3a9b8d 70%, #1e5f55 100%);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    filter: brightness(.6);
 }
 .hero-overlay {
     position: absolute; inset: 0;
@@ -407,8 +411,6 @@ body {
     transition: all .15s;
 }
 .tag-t:hover, .tag-t.active { background: #c0651a; color: #fff; border-color: #c0651a; }
-/* classe antiga — mantida para compatibilidade */
-.mapa-layout { display: none; }
 .calc-btn {
     width: 100%; margin-top: .5rem;
     background: var(--red-btn); color: #fff;
@@ -482,17 +484,6 @@ body {
     .hero-content h1 { font-size: 2rem; }
     .features { padding: 3rem 1.2rem; }
     .dash-stats { grid-template-columns: repeat(2,1fr); }
-}
-
-/* ============================================================
-   IMAGENS — HOME
-   ============================================================ */
-.hero-bg-img {
-    position: absolute; inset: 0;
-    background-size: cover !important;
-    background-position: center !important;
-    background-repeat: no-repeat !important;
-    filter: brightness(.6);
 }
 
 .feature-img {
