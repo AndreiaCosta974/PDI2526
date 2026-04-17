@@ -38,6 +38,7 @@
     <div class="detalhe-actions">
         <a href="{% url 'editar_roteiro' roteiro.pk %}" class="btn-outline">✏️ Editar Roteiro</a>
         <a href="{% url 'mapa' %}" class="btn-primary">🗺️ Ver no Mapa</a>
+        <button class="btn-outline" onclick="exportarPDF()">📄 Exportar PDF</button>
         <a href="{% url 'eliminar_roteiro' roteiro.pk %}" class="btn-danger">🗑️ Eliminar</a>
     </div>
 
@@ -168,6 +169,197 @@
 
 {% block extra_scripts %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+const { jsPDF } = window.jspdf;
+
+// Dados do roteiro passados pelo Django
+const roteiroData = {
+    titulo: "{{ roteiro.titulo|escapejs }}",
+    descricao: "{{ roteiro.descricao|escapejs }}",
+    dataCriacao: "{{ roteiro.data_criacao|date:'d/m/Y' }}",
+    dias: [
+        {% for dia in roteiro.dias.all %}
+        {
+            numero: {{ dia.numero }},
+            titulo: "{{ dia.titulo|escapejs }}",
+            locais: [
+                {% for local in dia.locais.all %}
+                {
+                    nome: "{{ local.nome|escapejs }}",
+                    tipo: "{{ local.get_tipo_display|escapejs }}",
+                    notas: "{{ local.notas|escapejs }}",
+                    lat: {{ local.latitude }},
+                    lng: {{ local.longitude }},
+                },
+                {% endfor %}
+            ]
+        },
+        {% endfor %}
+    ]
+};
+
+function exportarPDF() {
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const W = doc.internal.pageSize.getWidth();
+    const H = doc.internal.pageSize.getHeight();
+    const margem = 18;
+    const largura = W - margem * 2;
+    let y = 0;
+
+    const corVerde    = [42, 124, 111];
+    const corVerdeEsc = [30, 95, 85];
+    const corCinza    = [120, 130, 125];
+    const corTexto    = [40, 50, 48];
+    const corBranco   = [255, 255, 255];
+
+    function novaPageSeNecessario(espaco) {
+        if (y + espaco > H - 16) {
+            doc.addPage();
+            y = 20;
+        }
+    }
+
+    // ── Cabeçalho ──
+    doc.setFillColor(...corVerde);
+    doc.rect(0, 0, W, 42, 'F');
+
+    doc.setFillColor(...corVerdeEsc);
+    doc.rect(0, 36, W, 6, 'F');
+
+    doc.setTextColor(...corBranco);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.text('GeoRota', margem, 16);
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text('O teu roteiro de viagem', margem, 24);
+
+    // Data no topo direito
+    doc.setFontSize(9);
+    doc.text(`Criado em ${roteiroData.dataCriacao}`, W - margem, 16, { align: 'right' });
+
+    y = 58;
+
+    // ── Título do Roteiro ──
+    doc.setTextColor(...corVerdeEsc);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    const linhasTitulo = doc.splitTextToSize(roteiroData.titulo, largura);
+    doc.text(linhasTitulo, margem, y);
+    y += linhasTitulo.length * 8 + 2;
+
+    // Linha separadora
+    doc.setDrawColor(...corVerde);
+    doc.setLineWidth(0.5);
+    doc.line(margem, y, W - margem, y);
+    y += 6;
+
+    // ── Descrição ──
+    if (roteiroData.descricao) {
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(10);
+        doc.setTextColor(...corCinza);
+        const linhasDesc = doc.splitTextToSize(roteiroData.descricao, largura);
+        doc.text(linhasDesc, margem, y);
+        y += linhasDesc.length * 5 + 6;
+    }
+
+    // ── Resumo ──
+    doc.setFillColor(240, 248, 246);
+    doc.roundedRect(margem, y, largura, 14, 3, 3, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...corVerde);
+    const totalLocais = roteiroData.dias.reduce((s, d) => s + d.locais.length, 0);
+    doc.text(`${roteiroData.dias.length} dia(s)   ·   ${totalLocais} local(ais) no roteiro`, margem + 5, y + 9);
+    y += 22;
+
+    // ── Dias ──
+    roteiroData.dias.forEach((dia, idx) => {
+        novaPageSeNecessario(28);
+
+        // Cabeçalho do dia
+        doc.setFillColor(...corVerde);
+        doc.roundedRect(margem, y, largura, 11, 2, 2, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.setTextColor(...corBranco);
+        const tituloDia = dia.titulo ? `Dia ${dia.numero} — ${dia.titulo}` : `Dia ${dia.numero}`;
+        doc.text(tituloDia, margem + 5, y + 7.5);
+        y += 16;
+
+        if (dia.locais.length === 0) {
+            doc.setFont('helvetica', 'italic');
+            doc.setFontSize(9);
+            doc.setTextColor(...corCinza);
+            doc.text('Nenhum local adicionado.', margem + 5, y);
+            y += 10;
+        }
+
+        dia.locais.forEach((local, li) => {
+            novaPageSeNecessario(20);
+
+            // Fundo alternado
+            if (li % 2 === 0) {
+                doc.setFillColor(248, 252, 251);
+                doc.rect(margem, y - 1, largura, 16, 'F');
+            }
+
+            // Número
+            doc.setFillColor(...corVerdeEsc);
+            doc.circle(margem + 5, y + 6, 4, 'F');
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(8);
+            doc.setTextColor(...corBranco);
+            doc.text(String(li + 1), margem + 5, y + 8, { align: 'center' });
+
+            // Nome
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            doc.setTextColor(...corTexto);
+            const linhasNome = doc.splitTextToSize(local.nome, largura - 22);
+            doc.text(linhasNome, margem + 13, y + 5);
+
+            // Tipo
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.setTextColor(...corCinza);
+            doc.text(local.tipo, margem + 13, y + 11);
+
+            // Notas
+            if (local.notas) {
+                const linhasNotas = doc.splitTextToSize(`📝 ${local.notas}`, largura - 22);
+                doc.setFontSize(8);
+                doc.setTextColor(100, 120, 115);
+                doc.text(linhasNotas, margem + 13, y + 11 + (linhasNome.length > 1 ? linhasNome.length * 4 : 0));
+                y += linhasNotas.length * 4;
+            }
+
+            y += 18;
+        });
+
+        y += 4;
+    });
+
+    // ── Rodapé ──
+    const totalPaginas = doc.internal.getNumberOfPages();
+    for (let p = 1; p <= totalPaginas; p++) {
+        doc.setPage(p);
+        doc.setFillColor(...corVerde);
+        doc.rect(0, H - 12, W, 12, 'F');
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(...corBranco);
+        doc.text('GeoRota — Planeamento de Viagens', margem, H - 4.5);
+        doc.text(`Página ${p} de ${totalPaginas}`, W - margem, H - 4.5, { align: 'right' });
+    }
+
+    const nomeFicheiro = roteiroData.titulo.replace(/[^a-zA-Z0-9À-ÿ ]/g, '').trim() || 'roteiro';
+    doc.save(`${nomeFicheiro}.pdf`);
+}
+</script>
 <script>
 const API_KEY = "{{ api_key }}";
 const locais  = {{ locais_json|safe }};

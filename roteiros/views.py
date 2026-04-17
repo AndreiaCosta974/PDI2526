@@ -5,6 +5,8 @@ from .models import Roteiro, Dia, Local
 import json
 from django.conf import settings
 from django.http import JsonResponse
+from django.db.models import Max
+
 
 @login_required
 def criar_roteiro(request):
@@ -14,15 +16,20 @@ def criar_roteiro(request):
         roteiro = Roteiro.objects.create(
             utilizador=request.user,
             titulo=titulo,
-            descricao=descricao
+            descricao=descricao,
         )
         messages.success(request, 'Roteiro criado!')
         return redirect('dashboard')
     return render(request, 'criar_roteiro.html')
 
+
 @login_required
 def detalhe_roteiro(request, pk):
-    roteiro = get_object_or_404(Roteiro, pk=pk, utilizador=request.user)
+    roteiro = get_object_or_404(
+        Roteiro.objects.prefetch_related('dias__locais'),
+        pk=pk,
+        utilizador=request.user,
+    )
     locais_json = []
     for dia in roteiro.dias.all():
         for local in dia.locais.all():
@@ -36,8 +43,10 @@ def detalhe_roteiro(request, pk):
     return render(request, 'detalhe_roteiro.html', {
         'roteiro': roteiro,
         'locais_json': json.dumps(locais_json),
-        'api_key': settings.GEOAPIFY_API_KEY,  # ← adiciona esta linha
+        'api_key': settings.GEOAPIFY_API_KEY,
     })
+
+
 @login_required
 def editar_roteiro(request, pk):
     roteiro = get_object_or_404(Roteiro, pk=pk, utilizador=request.user)
@@ -49,6 +58,7 @@ def editar_roteiro(request, pk):
         return redirect('detalhe_roteiro', pk=pk)
     return render(request, 'editar_roteiro.html', {'roteiro': roteiro})
 
+
 @login_required
 def eliminar_roteiro(request, pk):
     roteiro = get_object_or_404(Roteiro, pk=pk, utilizador=request.user)
@@ -58,26 +68,24 @@ def eliminar_roteiro(request, pk):
         return redirect('dashboard')
     return render(request, 'confirmar_eliminar.html', {'roteiro': roteiro})
 
-@login_required
-def mapa(request):
-    return render(request, 'mapa.html', {
-        'api_key': settings.GEOAPIFY_API_KEY
-    })
 
 @login_required
 def adicionar_dia(request, roteiro_pk):
     roteiro = get_object_or_404(Roteiro, pk=roteiro_pk, utilizador=request.user)
     if request.method == 'POST':
-        numero = roteiro.dias.count() + 1
+        max_numero = roteiro.dias.aggregate(m=Max('numero'))['m'] or 0
+        numero = max_numero + 1
         titulo = request.POST.get('titulo', f'Dia {numero}')
-        dia = Dia.objects.create(roteiro=roteiro, numero=numero, titulo=titulo)
+        Dia.objects.create(roteiro=roteiro, numero=numero, titulo=titulo)
         messages.success(request, f'Dia {numero} adicionado!')
     return redirect('detalhe_roteiro', pk=roteiro_pk)
+
 
 @login_required
 def adicionar_local(request, dia_pk):
     dia = get_object_or_404(Dia, pk=dia_pk, roteiro__utilizador=request.user)
     if request.method == 'POST':
+        max_ordem = dia.locais.aggregate(m=Max('ordem'))['m'] or 0
         Local.objects.create(
             dia=dia,
             nome=request.POST.get('nome'),
@@ -85,10 +93,11 @@ def adicionar_local(request, dia_pk):
             latitude=float(request.POST.get('latitude')),
             longitude=float(request.POST.get('longitude')),
             notas=request.POST.get('notas', ''),
-            ordem=dia.locais.count() + 1
+            ordem=max_ordem + 1,
         )
         messages.success(request, 'Local adicionado!')
     return redirect('detalhe_roteiro', pk=dia.roteiro.pk)
+
 
 @login_required
 def remover_local(request, local_pk):
@@ -98,30 +107,10 @@ def remover_local(request, local_pk):
     messages.success(request, 'Local removido.')
     return redirect('detalhe_roteiro', pk=roteiro_pk)
 
-@login_required
-def guardar_rota_mapa(request):
-    if request.method == 'POST':
-        data = json.loads(request.body)
-        titulo = data.get('titulo', 'Rota sem título')
-        waypoints = data.get('waypoints', [])
-        roteiro = Roteiro.objects.create(utilizador=request.user, titulo=titulo)
-        dia = Dia.objects.create(roteiro=roteiro, numero=1, titulo='Dia 1')
-        for i, wp in enumerate(waypoints):
-            Local.objects.create(
-                dia=dia,
-                nome=wp.get('nome', f'Ponto {i+1}'),
-                tipo='turismo',
-                latitude=wp['lat'],
-                longitude=wp['lng'],
-                ordem=i+1,
-            )
-        return JsonResponse({'ok': True})
-    return JsonResponse({'ok': False}, status=400)
 
 @login_required
 def guardar_rota_mapa(request):
     if request.method == 'POST':
-        import json
         data = json.loads(request.body)
         titulo = data.get('titulo', 'Rota do Mapa')
         waypoints = data.get('waypoints', [])
@@ -132,18 +121,18 @@ def guardar_rota_mapa(request):
         roteiro = Roteiro.objects.create(
             utilizador=request.user,
             titulo=titulo,
-            descricao=descricao
+            descricao=descricao,
         )
         dia = Dia.objects.create(roteiro=roteiro, numero=1, titulo='Dia 1')
         for i, wp in enumerate(waypoints):
             Local.objects.create(
                 dia=dia,
-                nome=wp.get('nome', f'Ponto {i+1}'),
+                nome=wp.get('nome', f'Ponto {i + 1}'),
                 tipo='turismo',
                 latitude=wp['lat'],
                 longitude=wp['lng'],
                 notas='',
-                ordem=i + 1
+                ordem=i + 1,
             )
         return JsonResponse({'ok': True, 'roteiro_pk': roteiro.pk})
     return JsonResponse({'ok': False}, status=400)
