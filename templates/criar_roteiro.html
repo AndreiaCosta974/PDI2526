@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}Novo Roteiro — GeoRota{% endblock %}
+
+{% block content %}
+<div class="form-page-wrapper">
+    <div class="form-card">
+        <h2 class="form-card-title">Criar a sua viagem</h2>
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label>Destino</label>
+                <input type="text" name="titulo" placeholder="ex: 3 Dias em Roma" required>
+            </div>
+            <div class="form-group">
+                <label>Número de dias da sua viagem</label>
+                <input type="number" name="num_dias" placeholder="ex: 3" min="1" max="30">
+            </div>
+            <div class="form-group">
+                <label>Notas</label>
+                <textarea name="descricao" rows="5" placeholder="Descreva os seus planos, dicas, notas..."></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn-primary">Criar Roteiro</button>
+                <a href="{% url 'dashboard' %}" class="btn-outline">Cancelar</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

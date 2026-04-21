@@ -1,0 +1,672 @@
+{% extends 'base.html' %}
+{% block title %}Mapa Interativo — GeoRota{% endblock %}
+
+{% load static %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+body { overflow: hidden; }
+
+/* ── Contentor principal ── */
+#geo-mapa-page {
+    background: #2a7c6f;
+    height: calc(100vh - 66px);
+    display: grid;
+    grid-template-columns: 310px 1fr;
+    gap: 14px;
+    padding: 14px;
+    box-sizing: border-box;
+}
+
+/* ── SIDEBAR ── */
+#geo-sidebar {
+    background: #1a2a35;
+    border-radius: 18px;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,.4);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,.15) transparent;
+}
+
+/* Topo — Explorar */
+#geo-sidebar .sb-top {
+    padding: 1rem 1.1rem .85rem;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+    flex-shrink: 0;
+}
+#geo-sidebar .sb-title {
+    display: flex; align-items: center; gap: .7rem;
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem; color: #fff; font-weight: 700;
+    margin-bottom: .85rem;
+}
+#geo-sidebar .sb-title-icon {
+    background: rgba(255,255,255,.1);
+    border: 2px solid rgba(255,255,255,.25);
+    border-radius: 10px; padding: .3rem .35rem;
+    width: 44px; height: 44px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+
+/* Search */
+#geo-sidebar .sb-search {
+    display: flex; gap: .4rem;
+    margin-bottom: .5rem;
+}
+#geo-sidebar .sb-search input {
+    flex: 1; padding: .55rem .9rem;
+    border: 1.5px solid rgba(255,255,255,.12);
+    border-radius: 22px;
+    background: rgba(255,255,255,.08);
+    font-family: 'DM Sans', sans-serif;
+    font-size: .85rem; color: #fff;
+    transition: border-color .2s, background .2s;
+    outline: none;
+}
+#geo-sidebar .sb-search input::placeholder { color: rgba(255,255,255,.38); }
+#geo-sidebar .sb-search input:focus {
+    border-color: #5ec8b8;
+    background: rgba(255,255,255,.15);
+}
+#geo-sidebar .sb-search .btn-search {
+    background: rgba(255,255,255,.12); color: #fff; border: none;
+    border-radius: 50%; padding: 0;
+    width: 36px; height: 36px; flex-shrink: 0;
+    cursor: pointer; font-size: .9rem; transition: background .2s;
+    display: flex; align-items: center; justify-content: center;
+}
+#geo-sidebar .sb-search .btn-search:hover { background: rgba(255,255,255,.25); }
+#geo-sidebar .sb-search .btn-loc {
+    background: #c0651a; color: #fff; border: none;
+    border-radius: 50%; padding: 0;
+    width: 36px; height: 36px; flex-shrink: 0;
+    cursor: pointer; font-size: .9rem; transition: opacity .2s;
+    display: flex; align-items: center; justify-content: center;
+}
+#geo-sidebar .sb-search .btn-loc:hover { opacity: .82; }
+
+/* Resultados pesquisa */
+#geo-search-results {
+    display: none;
+    background: #243447;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 10px;
+    max-height: 150px; overflow-y: auto;
+    margin-top: .3rem;
+}
+#geo-search-results .sr-item {
+    padding: .45rem .85rem;
+    display: flex; align-items: center; gap: .4rem;
+    font-size: .82rem; color: rgba(255,255,255,.88);
+    border-bottom: 1px solid rgba(255,255,255,.05);
+    font-family: 'DM Sans', sans-serif;
+    transition: background .15s;
+}
+#geo-search-results .sr-item:hover { background: rgba(42,124,111,.25); }
+#geo-search-results .sr-item:last-child { border-bottom: none; }
+
+/* Secções internas */
+#geo-sidebar .sb-section {
+    padding: .85rem 1.1rem;
+    border-bottom: 1px solid rgba(255,255,255,.07);
+    flex-shrink: 0;
+}
+#geo-sidebar .sb-section-title {
+    display: flex; align-items: center; gap: .7rem;
+    font-size: .95rem; color: #fff;
+    margin-bottom: .75rem; font-weight: 700;
+    font-family: 'Playfair Display', serif;
+    letter-spacing: 0;
+}
+#geo-sidebar .sb-section-title .si {
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+
+/* Tags POI */
+#geo-sidebar .sb-tags { display: flex; flex-wrap: wrap; gap: .3rem; }
+#geo-sidebar .sb-tag {
+    background: rgba(255,255,255,.1);
+    color: rgba(255,255,255,.82);
+    border-radius: 20px;
+    padding: .24rem .65rem;
+    font-size: .73rem; font-weight: 500;
+    border: 1.5px solid rgba(255,255,255,.12);
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: all .15s;
+}
+#geo-sidebar .sb-tag:hover,
+#geo-sidebar .sb-tag.active {
+    background: #2a7c6f;
+    color: #fff;
+    border-color: #2a7c6f;
+}
+
+/* Tags Transporte */
+#geo-sidebar .sb-tag-t {
+    background: rgba(255,255,255,.1);
+    color: rgba(255,255,255,.82);
+    border-radius: 20px;
+    padding: .24rem .65rem;
+    font-size: .73rem; font-weight: 500;
+    border: 1.5px solid rgba(255,255,255,.12);
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: all .15s;
+}
+#geo-sidebar .sb-tag-t:hover,
+#geo-sidebar .sb-tag-t.active {
+    background: #c0651a;
+    color: #fff;
+    border-color: #c0651a;
+}
+
+/* Waypoints */
+#geo-sidebar .sb-section.flex-grow { flex: 1; }
+#geo-sidebar .wp-hint {
+    font-size: .76rem; color: rgba(255,255,255,.35);
+    font-family: 'DM Sans', sans-serif;
+    margin-bottom: .4rem;
+}
+.geo-wp-item {
+    display: flex; align-items: center; gap: .55rem;
+    padding: .38rem .5rem; border-radius: 8px;
+    margin-bottom: .3rem;
+    background: rgba(255,255,255,.07);
+}
+.geo-wp-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.geo-wp-name { flex: 1; font-size: .8rem; color: rgba(255,255,255,.85); font-family: 'DM Sans', sans-serif; }
+.geo-wp-remove {
+    background: none; border: none; cursor: pointer;
+    color: rgba(255,255,255,.35); font-size: .88rem;
+    padding: 0 .2rem; transition: color .2s; line-height: 1;
+}
+.geo-wp-remove:hover { color: #e74c3c; }
+
+/* Calcular */
+#geo-sidebar .calc-rota-btn {
+    width: 100%; margin-top: .7rem;
+    background: #c0392b; color: #fff;
+    border: none; border-radius: 10px; padding: .75rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .9rem; font-weight: 700;
+    cursor: pointer; transition: opacity .2s;
+    letter-spacing: .02em;
+}
+.calc-rota-btn:hover { opacity: .88; }
+
+/* Route stats */
+.geo-route-stats {
+    display: flex; gap: .8rem; margin-top: .7rem;
+    background: rgba(42,124,111,.25);
+    border-radius: 10px; padding: .8rem;
+    border: 1px solid rgba(42,124,111,.4);
+}
+.geo-rs { flex: 1; text-align: center; }
+.geo-rs-val { font-size: 1.1rem; font-weight: 700; color: #5ec8b8; font-family: 'Playfair Display', serif; }
+.geo-rs-lbl { font-size: .65rem; color: rgba(255,255,255,.45); text-transform: uppercase; font-family: 'DM Sans', sans-serif; margin-top: .15rem; }
+.geo-clear-route {
+    width: 100%; margin-top: .5rem;
+    background: rgba(255,255,255,.08); color: rgba(255,255,255,.6);
+    border: 1px solid rgba(255,255,255,.15); border-radius: 8px;
+    padding: .4rem; font-family: 'DM Sans', sans-serif;
+    font-size: .78rem; cursor: pointer; transition: all .2s;
+    display: block; text-align: center; text-decoration: none;
+}
+.geo-clear-route:hover { background: rgba(255,255,255,.15); color: #fff; }
+.geo-save-route {
+    display: block; width: 100%; margin-top: .6rem;
+    background: #1e5f55; color: #fff;
+    border: none; border-radius: 8px;
+    padding: .5rem; font-family: 'DM Sans', sans-serif;
+    font-size: .82rem; font-weight: 600; cursor: pointer;
+    text-align: center; text-decoration: none;
+    transition: background .2s;
+}
+.geo-save-route:hover { background: #2a7c6f; color: #fff; }
+
+/* ── MAPA ── */
+#geo-mapa-col {
+    position: relative;
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,.3);
+}
+#mapa { width: 100%; height: 100%; }
+
+#geo-loading {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,.4);
+    display: none; align-items: center; justify-content: center;
+    z-index: 2000;
+}
+.geo-spinner {
+    width: 32px; height: 32px;
+    border: 3px solid rgba(255,255,255,.2);
+    border-top-color: #5ec8b8; border-radius: 50%;
+    animation: geo-spin .7s linear infinite;
+}
+@keyframes geo-spin { to { transform: rotate(360deg); } }
+
+#geo-fab {
+    position: absolute; bottom: 1.2rem; right: 1.2rem;
+    z-index: 1000; display: flex; flex-direction: column; gap: .4rem;
+}
+.geo-fab-btn {
+    background: #fff; border: 1px solid #ddd;
+    width: 38px; height: 38px; border-radius: 10px;
+    cursor: pointer; font-size: .95rem;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,.2); transition: all .2s;
+}
+.geo-fab-btn:hover { background: #e8f5f3; border-color: #2a7c6f; }
+
+#geo-toast {
+    position: fixed; bottom: 2rem; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #1a2a35; color: #fff;
+    padding: .6rem 1.3rem; border-radius: 10px;
+    font-size: .85rem; z-index: 9999;
+    transition: transform .3s ease;
+    box-shadow: 0 4px 20px rgba(0,0,0,.4);
+    border: 1px solid rgba(255,255,255,.1);
+    font-family: 'DM Sans', sans-serif;
+}
+#geo-toast.show { transform: translateX(-50%) translateY(0); }
+
+@media (max-width: 800px) {
+    #geo-mapa-page {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        height: auto;
+    }
+    #geo-sidebar { max-height: 320px; }
+    body { overflow: auto; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="geo-mapa-page">
+
+    <!-- ── SIDEBAR ── -->
+    <div id="geo-sidebar">
+
+        <!-- Explorar / Pesquisa -->
+        <div class="sb-top">
+            <div class="sb-title">
+                <span class="sb-title-icon">
+                    <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="13" cy="13" r="11.5" stroke="white" stroke-width="1.6"/>
+                        <ellipse cx="13" cy="13" rx="5" ry="11.5" stroke="white" stroke-width="1.6"/>
+                        <line x1="1.5" y1="13" x2="24.5" y2="13" stroke="white" stroke-width="1.6"/>
+                    </svg>
+                </span> Explorar
+            </div>
+            <div class="sb-search">
+                <input id="geoSearchInput" type="text" placeholder="Pesquisar local, cidade...">
+                <button class="btn-search" onclick="geoPesquisar()" title="Pesquisar">🔍</button>
+                <button class="btn-loc" onclick="geoMinhaLoc()" title="A minha localização">📍</button>
+            </div>
+            <div id="geo-search-results"></div>
+        </div>
+
+        <!-- Pontos de Interesse -->
+        <div class="sb-section">
+            <div class="sb-section-title">
+                <span class="si">
+                    <svg width="20" height="26" viewBox="0 0 20 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M10 0C4.477 0 0 4.477 0 10C0 17.5 10 26 10 26C10 26 20 17.5 20 10C20 4.477 15.523 0 10 0Z" fill="#e74c3c"/>
+                        <circle cx="10" cy="10" r="4" fill="white"/>
+                    </svg>
+                </span> Pontos de Interesse
+            </div>
+            <div class="sb-tags">
+                <button class="sb-tag" data-type="tourism"          onclick="geoBuscarPOI('tourism')">Atrações e experiências</button>
+                <button class="sb-tag" data-type="hotel"            onclick="geoBuscarPOI('hotel')">Alojamento</button>
+                <button class="sb-tag" data-type="shopping"         onclick="geoBuscarPOI('shopping')">Compras</button>
+                <button class="sb-tag" data-type="social"           onclick="geoBuscarPOI('social')">Conteúdo social</button>
+                <button class="sb-tag" data-type="nightlife"        onclick="geoBuscarPOI('nightlife')">Vida noturna</button>
+                <button class="sb-tag" data-type="restaurant"       onclick="geoBuscarPOI('restaurant')">Gastronomia</button>
+                <button class="sb-tag" data-type="services"         onclick="geoBuscarPOI('services')">Serviços úteis</button>
+                <button class="sb-tag" data-type="convenience"      onclick="geoBuscarPOI('convenience')">Conveniência para viajantes</button>
+            </div>
+        </div>
+
+        <!-- Meios de Transporte -->
+        <div class="sb-section">
+            <div class="sb-section-title">
+                <span class="si" style="color:#e67e22; font-size:1.4rem;">🚗</span> Meios de Transporte
+            </div>
+            <div class="sb-tags">
+                <button class="sb-tag-t active" data-mode="drive"      onclick="geoSetTransp('drive')">Carro</button>
+                <button class="sb-tag-t"        data-mode="walk"       onclick="geoSetTransp('walk')">A pé</button>
+                <button class="sb-tag-t"        data-mode="bicycle"    onclick="geoSetTransp('bicycle')">Bicicletas ou trotinetes</button>
+                <button class="sb-tag-t"        data-mode="transit"    onclick="geoSetTransp('transit')">Autocarro</button>
+                <button class="sb-tag-t"        data-mode="train"      onclick="geoSetTransp('train')">Comboio</button>
+                <button class="sb-tag-t"        data-mode="subway"     onclick="geoSetTransp('subway')">Metro</button>
+            </div>
+        </div>
+
+        <!-- Pontos de Rotas -->
+        <div class="sb-section flex-grow">
+            <div class="sb-section-title">
+                <span class="si" style="font-size:1.4rem;">📌</span> Pontos de Rotas
+            </div>
+            <p class="wp-hint" id="geoWpHint">Clica no mapa para adicionar pontos à rota.</p>
+            <div id="geoWaypointsList"></div>
+            <button class="calc-rota-btn" onclick="geoCalcularRota()">Calcular</button>
+            <div id="geoRouteInfo" style="display:none;">
+                <div class="geo-route-stats">
+                    <div class="geo-rs">
+                        <div class="geo-rs-val" id="geoRouteDist">—</div>
+                        <div class="geo-rs-lbl">Distância</div>
+                    </div>
+                    <div class="geo-rs">
+                        <div class="geo-rs-val" id="geoRouteTime">—</div>
+                        <div class="geo-rs-lbl">Tempo estimado</div>
+                    </div>
+                </div>
+                <button class="geo-save-route" id="geoSaveRouteBtn" onclick="geoGuardarRota()">
+                    💾 Guardar nos Roteiros
+                </button>
+                <button class="geo-clear-route" onclick="geoClearRoute()">🗑 Limpar rota</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ── MAPA ── -->
+    <div id="geo-mapa-col">
+        <div id="mapa"></div>
+        <div id="geo-loading"><div class="geo-spinner"></div></div>
+        <div id="geo-fab">
+            <button class="geo-fab-btn" onclick="geoLimpar()" title="Limpar mapa">🗑️</button>
+            <button class="geo-fab-btn" onclick="mapa.setView([39.7,-8.0],7)" title="Portugal">🇵🇹</button>
+        </div>
+    </div>
+
+</div>
+
+<div id="geo-toast"></div>
+
+<!-- Modal guardar rota -->
+<div id="geoModalGuardar" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9998;align-items:center;justify-content:center;">
+    <div style="background:#1a2a35;border-radius:16px;padding:1.8rem 2rem;min-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.1);">
+        <h3 style="font-family:'Playfair Display',serif;color:#fff;margin:0 0 1rem;font-size:1.15rem;">Guardar Roteiro</h3>
+        <label style="font-family:'DM Sans',sans-serif;font-size:.85rem;color:rgba(255,255,255,.65);display:block;margin-bottom:.4rem;">Nome do roteiro</label>
+        <input id="geoRoteiraTitulo" type="text" placeholder="ex: Fim de semana em Paris"
+            style="width:100%;box-sizing:border-box;padding:.6rem .9rem;border-radius:10px;border:1.5px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;font-family:'DM Sans',sans-serif;font-size:.9rem;outline:none;">
+        <div style="display:flex;gap:.7rem;margin-top:1.2rem;">
+            <button onclick="geoConfirmarGuardar()" style="flex:1;background:#2a7c6f;color:#fff;border:none;border-radius:10px;padding:.65rem;font-family:'DM Sans',sans-serif;font-weight:700;font-size:.9rem;cursor:pointer;">Guardar</button>
+            <button onclick="geoFecharModal()" style="flex:1;background:rgba(255,255,255,.08);color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:.65rem;font-family:'DM Sans',sans-serif;font-size:.9rem;cursor:pointer;">Cancelar</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const API_KEY = "{{ api_key }}";
+
+const mapa = L.map('mapa').setView([39.7, -8.0], 7);
+// CartoDB tiles — não bloqueiam localhost
+L.tileLayer(`https://maps.geoapify.com/v1/tile/osm-bright/{z}/{x}/{y}.png?apiKey=${API_KEY}&lang=pt`, {
+    attribution: '© OpenStreetMap contributors © Geoapify',
+    maxZoom: 20
+}).addTo(mapa);
+
+let waypoints     = [];
+let poiMarkers    = [];
+let searchMarkers = [];
+let routeLayer    = null;
+let transportMode = 'drive';
+let centerLatLng  = null;
+
+mapa.on('click', e => geoAddWp(e.latlng.lat, e.latlng.lng, `Ponto ${waypoints.length + 1}`));
+
+async function geoPesquisar() {
+    const q = document.getElementById('geoSearchInput').value.trim();
+    if (!q) return;
+    geoLoading(true);
+    try {
+        const res  = await fetch(`https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(q)}&lang=pt&limit=5&apiKey=${API_KEY}`);
+        const data = await res.json();
+        geoMostrarResultados(data.features || []);
+    } catch { geoToast('Erro na pesquisa.'); }
+    finally { geoLoading(false); }
+}
+
+function geoMostrarResultados(features) {
+    const c = document.getElementById('geo-search-results');
+    searchMarkers.forEach(m => mapa.removeLayer(m)); searchMarkers = [];
+    if (!features.length) { c.style.display='block'; c.innerHTML='<div class="sr-item">Sem resultados.</div>'; return; }
+    c.style.display = 'block';
+    c.innerHTML = features.map(f => {
+        const nome = f.properties.name || f.properties.formatted;
+        const sub  = f.properties.city || f.properties.country || '';
+        return `<div class="sr-item" onclick="geoIrPara(${f.geometry.coordinates[1]},${f.geometry.coordinates[0]},'${nome.replace(/'/g,"\\'")}')">
+            <strong>${nome}</strong>${sub?` <small style="opacity:.55">— ${sub}</small>`:''}
+        </div>`;
+    }).join('');
+    const [lng, lat] = features[0].geometry.coordinates;
+    centerLatLng = { lat, lng };
+    mapa.setView([lat, lng], 13);
+    features.forEach(f => {
+        const [lng, lat] = f.geometry.coordinates;
+        searchMarkers.push(L.marker([lat,lng],{icon:geoIconSearch()}).addTo(mapa).bindPopup(`<b>${f.properties.name||f.properties.formatted}</b>`));
+    });
+}
+
+function geoIrPara(lat, lng) {
+    mapa.setView([lat,lng],15); centerLatLng={lat,lng};
+    document.getElementById('geo-search-results').style.display='none';
+}
+
+async function geoBuscarPOI(tipo) {
+    if (!centerLatLng) { geoToast('Pesquisa um local primeiro.'); return; }
+    document.querySelectorAll('.sb-tag[data-type]').forEach(b => b.classList.toggle('active', b.dataset.type===tipo));
+    geoLoading(true);
+    poiMarkers.forEach(m => mapa.removeLayer(m)); poiMarkers=[];
+    const cats = {
+        pharmacy: 'healthcare.pharmacy',
+        hospital: 'healthcare.hospital',
+        restaurant: 'catering.restaurant',
+        hotel: 'accommodation.hotel',
+        charging_station: 'vehicle.charging_station',
+        tourism: 'tourism.sights',
+        shopping: 'commercial.shopping_mall',
+        social: 'entertainment',
+        nightlife: 'entertainment.nightclub',
+        services: 'service',
+        convenience: 'commercial.convenience'
+    };
+    try {
+        const res  = await fetch(`https://api.geoapify.com/v2/places?categories=${cats[tipo]||tipo}&filter=circle:${centerLatLng.lng},${centerLatLng.lat},3000&limit=15&apiKey=${API_KEY}`);
+        const data = await res.json();
+        (data.features||[]).forEach(f => {
+            const [lng,lat]=f.geometry.coordinates, nome=f.properties.name||tipo;
+            poiMarkers.push(L.marker([lat,lng],{icon:geoIconPOI(tipo)}).addTo(mapa)
+                .bindPopup(`<b>${nome}</b><br><small>${f.properties.formatted||''}</small><br>
+                    <button onclick="geoAddWp(${lat},${lng},'${nome.replace(/'/g,"\\'")}');" style="margin-top:.4rem;padding:.3rem .6rem;background:#1e5f55;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:.8rem">+ Rota</button>`));
+        });
+        geoToast(`${poiMarkers.length} locais encontrados`);
+    } catch { geoToast('Erro ao buscar POIs.'); }
+    finally { geoLoading(false); }
+}
+
+function geoAddWp(lat, lng, nome) {
+    waypoints.push({lat,lng,nome}); geoRenderWp();
+    geoToast(`📍 ${nome} adicionado`);
+}
+function geoRemWp(i) { waypoints.splice(i,1); geoRenderWp(); }
+function geoRenderWp() {
+    const lista=document.getElementById('geoWaypointsList'), hint=document.getElementById('geoWpHint');
+    if (!waypoints.length) { lista.innerHTML=''; hint.style.display='block'; return; }
+    hint.style.display='none';
+    lista.innerHTML=waypoints.map((w,i)=>`
+        <div class="geo-wp-item">
+            <div class="geo-wp-dot" style="background:${i===0?'#2a7c6f':i===waypoints.length-1?'#e74c3c':'#3b82f6'}"></div>
+            <span class="geo-wp-name">${w.nome}</span>
+            <button class="geo-wp-remove" onclick="geoRemWp(${i})">✕</button>
+        </div>`).join('');
+}
+
+async function geoCalcularRota() {
+    if (waypoints.length < 2) { geoToast('Adiciona pelo menos 2 pontos.'); return; }
+
+    // Validar que todos os pontos têm coordenadas reais
+    const invalidos = waypoints.filter(w => w.lat === 0 && w.lng === 0);
+    if (invalidos.length > 0) {
+        geoToast('⚠️ Alguns pontos não têm coordenadas válidas.');
+        return;
+    }
+
+    geoLoading(true);
+    if (routeLayer) mapa.removeLayer(routeLayer);
+
+    // Formato correto da API Geoapify: lat,lng separados por |
+    const coords = waypoints.map(w => `${w.lat},${w.lng}`).join('|');
+    const url = `https://api.geoapify.com/v1/routing?waypoints=${coords}&mode=${transportMode}&apiKey=${API_KEY}`;
+
+    try {
+        const res  = await fetch(url);
+        const data = await res.json();
+
+        // Verificar erros da API
+        if (data.statusCode && data.statusCode !== 200) {
+            geoToast(`Erro API: ${data.message || 'Verifica a API key.'}`);
+            geoLoading(false);
+            return;
+        }
+
+        if (data.features && data.features.length > 0) {
+            routeLayer = L.geoJSON(data, {
+                style: { color: '#2a7c6f', weight: 5, opacity: 0.85 }
+            }).addTo(mapa);
+            mapa.fitBounds(routeLayer.getBounds(), { padding: [40, 40] });
+
+            const props = data.features[0].properties;
+            const distKm = (props.distance / 1000).toFixed(1);
+            const timeMin = Math.round(props.time / 60);
+            const timeStr = timeMin >= 60
+                ? `${Math.floor(timeMin/60)}h ${timeMin%60}min`
+                : `${timeMin} min`;
+
+            document.getElementById('geoRouteDist').textContent = distKm + ' km';
+            document.getElementById('geoRouteTime').textContent = timeStr;
+            document.getElementById('geoRouteInfo').style.display = 'block';
+            geoToast(`✅ Rota: ${distKm} km · ${timeStr}`);
+        } else {
+            geoToast('Não foi possível calcular a rota entre estes pontos.');
+        }
+    } catch (err) {
+        console.error('Erro rota:', err);
+        geoToast('Erro de ligação ao calcular rota.');
+    } finally {
+        geoLoading(false);
+    }
+}
+
+function geoSetTransp(mode) {
+    // Geoapify suporta: drive, walk, bicycle, transit, motorcycle
+    // train e subway são mapeados para transit
+    const modeMap = { train: 'transit', subway: 'transit' };
+    transportMode = modeMap[mode] || mode;
+    document.querySelectorAll('.sb-tag-t').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
+}
+
+function geoMinhaLoc() {
+    navigator.geolocation.getCurrentPosition(pos=>{
+        const{latitude:lat,longitude:lng}=pos.coords;
+        centerLatLng={lat,lng}; mapa.setView([lat,lng],14);
+        L.marker([lat,lng],{icon:geoIconMinha()}).addTo(mapa).bindPopup('📍 Estás aqui!').openPopup();
+    },()=>geoToast('Não foi possível obter localização.'));
+}
+
+function geoClearRoute() {
+    if (routeLayer) { mapa.removeLayer(routeLayer); routeLayer = null; }
+    waypoints = [];
+    geoRenderWp();
+    document.getElementById('geoRouteInfo').style.display = 'none';
+    geoToast('Rota limpa.');
+}
+
+function geoLimpar() {
+    waypoints=[]; poiMarkers.forEach(m=>mapa.removeLayer(m)); searchMarkers.forEach(m=>mapa.removeLayer(m));
+    poiMarkers=[]; searchMarkers=[];
+    if(routeLayer) mapa.removeLayer(routeLayer); routeLayer=null;
+    geoRenderWp(); document.getElementById('geoRouteInfo').style.display='none';
+    document.querySelectorAll('.sb-tag').forEach(b=>b.classList.remove('active'));
+    geoToast('Mapa limpo!');
+}
+
+function geoLoading(s) { document.getElementById('geo-loading').style.display=s?'flex':'none'; }
+function geoToast(msg) {
+    const t=document.getElementById('geo-toast');
+    t.textContent=msg; t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'),3000);
+}
+function geoIconSearch() { return L.divIcon({className:'',html:'<div style="background:#2a7c6f;width:11px;height:11px;border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.4)"></div>',iconSize:[11,11],iconAnchor:[5,5]}); }
+function geoIconPOI(tipo) {
+    const e={pharmacy:'💊',hospital:'🏥',restaurant:'🍽️',hotel:'🏨',charging_station:'⚡',tourism:'🏛️',shopping:'🛍️'};
+    return L.divIcon({className:'',html:`<div style="font-size:1.2rem;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))">${e[tipo]||'📍'}</div>`,iconSize:[24,24],iconAnchor:[12,12]});
+}
+function geoIconMinha() { return L.divIcon({className:'',html:'<div style="background:#2a7c6f;width:15px;height:15px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.5)"></div>',iconSize:[15,15],iconAnchor:[7,7]}); }
+
+document.getElementById('geoSearchInput').addEventListener('keypress', e=>{ if(e.key==='Enter') geoPesquisar(); });
+
+function geoGuardarRota() {
+    if (!waypoints.length) { geoToast('Adiciona pontos à rota primeiro.'); return; }
+    const modal = document.getElementById('geoModalGuardar');
+    modal.style.display = 'flex';
+    const inp = document.getElementById('geoRoteiraTitulo');
+    // sugerir nome baseado no primeiro ponto
+    inp.value = waypoints[0]?.nome || '';
+    inp.focus();
+}
+
+function geoFecharModal() {
+    document.getElementById('geoModalGuardar').style.display = 'none';
+}
+
+async function geoConfirmarGuardar() {
+    const titulo = document.getElementById('geoRoteiraTitulo').value.trim();
+    if (!titulo) { document.getElementById('geoRoteiraTitulo').focus(); return; }
+    geoFecharModal();
+    geoLoading(true);
+    try {
+        const res = await fetch('/guardar-rota-mapa/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}',
+            },
+            body: JSON.stringify({ titulo, waypoints }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+            window.location.href = '/dashboard/';
+        } else {
+            geoToast('Erro ao guardar o roteiro.');
+        }
+    } catch {
+        geoToast('Erro de ligação.');
+    } finally {
+        geoLoading(false);
+    }
+}
+
+// fechar modal ao clicar fora
+document.getElementById('geoModalGuardar').addEventListener('click', function(e) {
+    if (e.target === this) geoFecharModal();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,23 @@
+# Segurança - NUNCA publicar
+.env
+
+# Base de dados local
+db.sqlite3
+
+# Ambiente virtual
+.venv/
+env/
+venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE
+.vscode/
+.idea/
+
+# Media uploads
+media/

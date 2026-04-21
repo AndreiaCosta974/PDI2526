@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}GeoRota{% endblock %}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar">
+        <a href="{% url 'home' %}" class="nav-logo">
+            <img src="{% static 'imgs/logo.png' %}" alt="GeoRota Logo">
+            GeoRota
+        </a>
+        <div class="nav-links">
+            {% if user.is_authenticated %}
+                <a href="{% url 'dashboard' %}">Dashboard</a>
+                <a href="{% url 'mapa' %}">Mapa</a>
+                <span style="color:var(--text-muted); font-size:.9rem;">Olá, {{ user.username }}</span>
+                <a href="{% url 'logout' %}" class="btn-outline btn-sm">Sair</a>
+            {% else %}
+                <a href="{% url 'login' %}" class="btn-outline btn-sm">Entrar</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        © 2025 GeoRota · Andreia Costa &amp; Francisco Gameiro · ISCAC
+    </footer>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>
