@@ -134,6 +134,32 @@
 }
 .side-countdown p { font-size: .75rem; opacity: .55; margin-top: .5rem; }
 
+/* Roteiros de Exemplo */
+.exemplo-section { margin-top: 2.5rem; }
+.exemplo-section .roteiros-title { margin-bottom: .3rem; }
+.exemplo-subtitle { font-size: .82rem; color: var(--text-muted); margin-bottom: 1rem; }
+.exemplo-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .85rem; }
+.exemplo-card {
+    background: var(--white); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 1.1rem 1.2rem;
+    display: flex; flex-direction: column; gap: .5rem;
+    transition: border-color .2s, transform .15s;
+    text-decoration: none; color: inherit;
+}
+.exemplo-card:hover { border-color: var(--green); transform: translateY(-2px); }
+.exemplo-header { display: flex; align-items: center; gap: .6rem; }
+.exemplo-emoji { font-size: 1.6rem; line-height: 1; }
+.exemplo-titulo { font-size: .93rem; font-weight: 700; color: var(--text); }
+.exemplo-destino { font-size: .75rem; color: var(--green-dark); font-weight: 600; }
+.exemplo-desc { font-size: .8rem; color: var(--text-muted); line-height: 1.4; }
+.exemplo-meta { display: flex; gap: .8rem; font-size: .75rem; color: var(--text-muted); }
+.exemplo-meta span { display: flex; align-items: center; gap: .25rem; }
+.exemplo-badge {
+    display: inline-block; font-size: .68rem; font-weight: 600;
+    background: var(--green-light); color: var(--green-dark);
+    border-radius: 99px; padding: .15rem .6rem; align-self: flex-start;
+}
+
 /* Responsive */
 @media (max-width: 960px) {
     .dash-page { grid-template-columns: 1fr; }
@@ -210,6 +236,31 @@
                 <a href="{% url 'criar_roteiro' %}" class="btn-primary">Criar Roteiro</a>
             </div>
         {% endif %}
+
+        <!-- Roteiros de Exemplo -->
+        <div class="exemplo-section">
+            <h2 class="roteiros-title">Roteiros de inspiração</h2>
+            <p class="exemplo-subtitle">Explora estes roteiros de exemplo e usa-os como ponto de partida.</p>
+            <div class="exemplo-grid">
+                {% for ex in roteiros_exemplo %}
+                <a href="{% url 'detalhe_exemplo' ex.slug %}" class="exemplo-card">
+                    <div class="exemplo-header">
+                        <span class="exemplo-emoji">{{ ex.emoji }}</span>
+                        <div>
+                            <div class="exemplo-titulo">{{ ex.titulo }}</div>
+                            <div class="exemplo-destino">📍 {{ ex.destino }}</div>
+                        </div>
+                    </div>
+                    <p class="exemplo-desc">{{ ex.descricao }}</p>
+                    <div class="exemplo-meta">
+                        <span>🗓️ {{ ex.dias|length }} dia{% if ex.dias|length != 1 %}s{% endif %}</span>
+                        <span>📌 {{ ex.total_locais }} locais</span>
+                    </div>
+                    <span class="exemplo-badge">Ver roteiro →</span>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
 
     </div>
 
