@@ -37,7 +37,7 @@
 
     <div class="detalhe-actions">
         <a href="{% url 'editar_roteiro' roteiro.pk %}" class="btn-outline">✏️ Editar Roteiro</a>
-        <a href="{% url 'mapa' %}" class="btn-primary">🗺️ Ver no Mapa</a>
+        <a href="{% url 'mapa' %}?roteiro={{ roteiro.pk }}" class="btn-primary">🗺️ Ver no Mapa</a>
         <button class="btn-outline" onclick="exportarPDF()">📄 Exportar PDF</button>
         <a href="{% url 'eliminar_roteiro' roteiro.pk %}" class="btn-danger">🗑️ Eliminar</a>
     </div>
@@ -105,7 +105,7 @@
     {% if roteiro.dias.count %}
     <div style="display:flex; justify-content:space-between; align-items:center; margin:2rem 0 1rem; flex-wrap:wrap; gap:.5rem;">
         <h2 style="font-family:var(--font-display); font-size:1.1rem; color:var(--text);">🗺️ Mapa do Roteiro</h2>
-        <a href="{% url 'mapa' %}" class="btn-outline btn-sm">Abrir Mapa Completo</a>
+        <a href="{% url 'mapa' %}?roteiro={{ roteiro.pk }}" class="btn-outline btn-sm">Abrir Mapa Completo</a>
     </div>
     <div id="mapa-roteiro"></div>
     {% endif %}

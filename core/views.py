@@ -1063,6 +1063,26 @@ def detalhe_exemplo(request, slug):
 
 @login_required
 def mapa(request):
+    roteiro_pk = request.GET.get('roteiro')
+    waypoints_json = '[]'
+    roteiro_titulo = ''
+    if roteiro_pk:
+        try:
+            roteiro = Roteiro.objects.prefetch_related('dias__locais').get(pk=roteiro_pk, utilizador=request.user)
+            roteiro_titulo = roteiro.titulo
+            waypoints = []
+            for dia in roteiro.dias.all():
+                for local in dia.locais.all():
+                    waypoints.append({
+                        'lat': local.latitude,
+                        'lng': local.longitude,
+                        'nome': local.nome,
+                    })
+            waypoints_json = json.dumps(waypoints)
+        except Roteiro.DoesNotExist:
+            pass
     return render(request, 'mapa.html', {
         'api_key': settings.GEOAPIFY_API_KEY,
+        'waypoints_json': waypoints_json,
+        'roteiro_titulo': roteiro_titulo,
     })

@@ -216,24 +216,24 @@
 
         {% if roteiros %}
             {% for roteiro in roteiros %}
-            <a href="{% url 'detalhe_roteiro' roteiro.pk %}" class="roteiro-list-item">
+            <div class="roteiro-list-item" onclick="window.location='{% url 'detalhe_roteiro' roteiro.pk %}'" style="cursor:pointer;">
                 <div class="roteiro-thumb">🗺️</div>
                 <div class="roteiro-info">
                     <strong>{{ roteiro.titulo }}</strong>
                     <span>{{ roteiro.data_criacao|date:"d/m/Y" }} · {{ roteiro.dias.count }} dia(s)</span>
                 </div>
-                <div class="roteiro-item-actions" onclick="event.preventDefault()">
+                <div class="roteiro-item-actions" onclick="event.stopPropagation()">
                     <a href="{% url 'editar_roteiro' roteiro.pk %}" class="btn-outline btn-sm">Editar</a>
                     <a href="{% url 'eliminar_roteiro' roteiro.pk %}" class="btn-danger btn-sm">✕</a>
                 </div>
-            </a>
+            </div>
             {% endfor %}
         {% else %}
             <div class="empty-state">
                 <div class="empty-icon">🗺️</div>
                 <h3>Ainda não tens roteiros</h3>
                 <p>Cria o teu primeiro roteiro e começa a planear a tua aventura!</p>
-                <a href="{% url 'criar_roteiro' %}" class="btn-primary">Criar Roteiro</a>
+                <a href="{% url 'mapa' %}" class="btn-primary">Criar Roteiro no Mapa</a>
             </div>
         {% endif %}
 
@@ -266,7 +266,7 @@
 
     <!-- ══ SIDEBAR DIREITA (verde escuro) ══ -->
     <div class="dash-sidebar">
-        <a href="{% url 'criar_roteiro' %}" class="sb-btn-white">+ Novo Roteiro</a>
+        <a href="{% url 'mapa' %}" class="sb-btn-white">+ Novo Roteiro</a>
         <a href="{% url 'mapa' %}" class="sb-btn-outline">Abrir Mapa</a>
 
         <div class="side-countdown">

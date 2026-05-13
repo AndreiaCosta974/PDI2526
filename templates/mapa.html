@@ -415,6 +415,8 @@ body { overflow: hidden; }
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const API_KEY = "{{ api_key }}";
+const WAYPOINTS_INICIAIS = {{ waypoints_json|default:"[]" }};
+const ROTEIRO_TITULO = "{{ roteiro_titulo|escapejs }}";
 
 const mapa = L.map('mapa').setView([39.7, -8.0], 7);
 // CartoDB tiles — não bloqueiam localhost
@@ -431,6 +433,19 @@ let transportMode = 'drive';
 let centerLatLng  = null;
 
 mapa.on('click', e => geoAddWp(e.latlng.lat, e.latlng.lng, `Ponto ${waypoints.length + 1}`));
+
+if (WAYPOINTS_INICIAIS.length > 0) {
+    WAYPOINTS_INICIAIS.forEach(wp => geoAddWp(wp.lat, wp.lng, wp.nome));
+    if (ROTEIRO_TITULO) geoToast(`🗺️ Roteiro carregado: ${ROTEIRO_TITULO}`);
+    setTimeout(() => {
+        if (waypoints.length > 0) {
+            const bounds = waypoints.map(w => [w.lat, w.lng]);
+            mapa.fitBounds(bounds, { padding: [60, 60] });
+        }
+    }, 300);
+} else {
+    setTimeout(() => geoToast('📍 Pesquisa um destino ou clica no mapa para adicionar pontos ao teu roteiro!'), 800);
+}
 
 async function geoPesquisar() {
     const q = document.getElementById('geoSearchInput').value.trim();

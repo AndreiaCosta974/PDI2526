@@ -19,7 +19,7 @@ def criar_roteiro(request):
             descricao=descricao,
         )
         messages.success(request, 'Roteiro criado!')
-        return redirect('dashboard')
+        return redirect('detalhe_roteiro', pk=roteiro.pk)
     return render(request, 'criar_roteiro.html')
 
 
