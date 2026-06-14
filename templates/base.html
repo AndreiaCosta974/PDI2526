@@ -8,6 +8,9 @@
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        img.emoji { height: 1em; width: 1em; margin: 0 .05em 0 .1em; vertical-align: -0.1em; display: inline; }
+    </style>
     {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -18,9 +21,17 @@
         </a>
         <div class="nav-links">
             {% if user.is_authenticated %}
-                <a href="{% url 'dashboard' %}">Dashboard</a>
+                <a href="{% url 'dashboard' %}">Painel</a>
                 <a href="{% url 'mapa' %}">Mapa</a>
-                <span style="color:var(--text-muted); font-size:.9rem;">Olá, {{ user.username }}</span>
+                <a href="{% url 'explorar' %}">Explorar</a>
+                <a href="{% url 'perfil' %}" style="display:inline-flex; align-items:center; gap:.5rem; text-decoration:none; color:var(--text);">
+                    {% if user.perfil.foto %}
+                        <img src="{{ user.perfil.foto.url }}" alt="perfil" style="width:32px; height:32px; border-radius:50%; object-fit:cover; border:1.5px solid var(--border);">
+                    {% else %}
+                        <span style="width:32px; height:32px; border-radius:50%; background:var(--green); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:.85rem;">{{ user.first_name|default:user.username|first|upper }}</span>
+                    {% endif %}
+                    <span style="font-size:.9rem;">Olá, {{ user.first_name|default:user.username }}</span>
+                </a>
                 <a href="{% url 'logout' %}" class="btn-outline btn-sm">Sair</a>
             {% else %}
                 <a href="{% url 'login' %}" class="btn-outline btn-sm">Entrar</a>
@@ -43,5 +54,16 @@
     </footer>
 
     {% block extra_scripts %}{% endblock %}
+
+    <script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous"></script>
+    <script>
+        if (window.twemoji) {
+            twemoji.parse(document.body, {
+                base: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/',
+                folder: 'svg',
+                ext: '.svg'
+            });
+        }
+    </script>
 </body>
 </html>

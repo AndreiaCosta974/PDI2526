@@ -19,6 +19,24 @@
     border-radius: 6px; transition: background .15s, color .15s;
 }
 .waypoint-remove:hover { background: #fee2e2; color: var(--red); }
+
+/* Controlos de dia/local */
+.dia-controls, .local-controls { display: flex; align-items: center; gap: .25rem; flex-shrink: 0; }
+.ctrl-btn {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 7px; padding: .25rem .5rem; cursor: pointer;
+    font-size: .85rem; line-height: 1; color: var(--text);
+    text-decoration: none; display: inline-flex; align-items: center;
+    transition: background .15s, border-color .15s, color .15s;
+}
+.ctrl-btn:hover { background: var(--green-light); border-color: var(--green); }
+.ctrl-danger:hover { background: #fee2e2; border-color: var(--red); color: var(--red); }
+.dia-rename { display: flex; gap: .5rem; margin: .3rem 0 .6rem; }
+.dia-rename input {
+    flex: 1; padding: .5rem .9rem; border: 1.5px solid var(--border);
+    border-radius: var(--radius); background: var(--white);
+    font-family: var(--font-body); font-size: .85rem; color: var(--text);
+}
 </style>
 {% endblock %}
 
@@ -33,6 +51,11 @@
     <p class="detalhe-meta">
         Criado em {{ roteiro.data_criacao|date:"d/m/Y" }} · {{ roteiro.dias.count }} dia(s)
         {% if roteiro.descricao %} · {{ roteiro.descricao|truncatechars:60 }}{% endif %}
+        {% if roteiro.publico %}
+            · <a href="{% url 'roteiro_publico' roteiro.pk %}" style="color:var(--green-dark); font-weight:700; text-decoration:none;">🌍 Público</a>
+        {% else %}
+            · <span style="color:var(--text-muted);">🔒 Privado</span>
+        {% endif %}
     </p>
 
     <div class="detalhe-actions">
@@ -59,10 +82,22 @@
     <div class="dia-accordion">
         <div class="dia-accordion-header">
             <h3>Dia {{ dia.numero }}{% if dia.titulo %} — {{ dia.titulo }}{% endif %}</h3>
-            <button class="btn-primary btn-sm" onclick="abrirModalLocal({{ dia.pk }})">
-                + Adicionar Local
-            </button>
+            <div class="dia-controls">
+                <a href="{% url 'mover_dia' dia.pk 'cima' %}" class="ctrl-btn" title="Mover para cima">↑</a>
+                <a href="{% url 'mover_dia' dia.pk 'baixo' %}" class="ctrl-btn" title="Mover para baixo">↓</a>
+                <button type="button" class="ctrl-btn" title="Renomear dia" onclick="toggleRename({{ dia.pk }})">✏️</button>
+                <form method="post" action="{% url 'eliminar_dia' dia.pk %}" style="display:inline;" onsubmit="return confirm('Eliminar este dia e todos os seus locais?');">
+                    {% csrf_token %}
+                    <button type="submit" class="ctrl-btn ctrl-danger" title="Eliminar dia">🗑️</button>
+                </form>
+                <button class="btn-primary btn-sm" onclick="abrirModalLocal({{ dia.pk }})">+ Local</button>
+            </div>
         </div>
+        <form method="post" action="{% url 'editar_dia' dia.pk %}" class="dia-rename" id="rename-{{ dia.pk }}" style="display:none;">
+            {% csrf_token %}
+            <input type="text" name="titulo" value="{{ dia.titulo }}" placeholder="Nome do dia (ex: Centro Histórico)">
+            <button type="submit" class="btn-primary btn-sm">Guardar nome</button>
+        </form>
         <div class="dia-accordion-body">
             {% for local in dia.locais.all %}
             <div class="local-item">
@@ -83,10 +118,16 @@
                         📍 {{ local.latitude|floatformat:4 }}, {{ local.longitude|floatformat:4 }}
                     </small>
                 </div>
-                <form method="post" action="{% url 'remover_local' local.pk %}">
-                    {% csrf_token %}
-                    <button type="submit" class="waypoint-remove" title="Remover">✕</button>
-                </form>
+                <div class="local-controls">
+                    <a href="{% url 'mover_local' local.pk 'cima' %}" class="ctrl-btn" title="Mover para cima">↑</a>
+                    <a href="{% url 'mover_local' local.pk 'baixo' %}" class="ctrl-btn" title="Mover para baixo">↓</a>
+                    <button type="button" class="ctrl-btn" title="Editar local"
+                            onclick="abrirEditarLocal({{ local.pk }}, '{{ local.nome|escapejs }}', '{{ local.tipo }}', '{{ local.notas|escapejs }}')">✏️</button>
+                    <form method="post" action="{% url 'remover_local' local.pk %}" style="display:inline;" onsubmit="return confirm('Remover este local?');">
+                        {% csrf_token %}
+                        <button type="submit" class="ctrl-btn ctrl-danger" title="Remover">✕</button>
+                    </form>
+                </div>
             </div>
             {% empty %}
             <p class="empty-msg">Nenhum local adicionado. Clica em "+ Adicionar Local".</p>
@@ -161,6 +202,41 @@
             <div style="display:flex; gap:.7rem; margin-top:1rem;">
                 <button type="submit" class="btn-primary" id="btnGuardarLocal" disabled>Guardar Local</button>
                 <button type="button" class="btn-outline" onclick="fecharModal()">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL EDITAR LOCAL -->
+<div class="modal-overlay" id="modalEditarLocal">
+    <div class="modal">
+        <button class="modal-close" onclick="fecharEditarLocal()">✕</button>
+        <h3>✏️ Editar Local</h3>
+        <form method="post" id="formEditarLocal">
+            {% csrf_token %}
+            <div class="form-group">
+                <label>Nome do Local</label>
+                <input type="text" name="nome" id="editNome" required>
+            </div>
+            <div class="form-group">
+                <label>Tipo</label>
+                <select name="tipo" id="editTipo">
+                    <option value="turismo">🏛 Turismo</option>
+                    <option value="restaurante">🍽 Restaurante</option>
+                    <option value="hotel">🏨 Hotel</option>
+                    <option value="hospital">🏥 Hospital</option>
+                    <option value="farmacia">💊 Farmácia</option>
+                    <option value="carregador">⚡ Carregador Elétrico</option>
+                    <option value="outro">📍 Outro</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Notas (opcional)</label>
+                <textarea name="notas" id="editNotas" rows="2" placeholder="Observações..."></textarea>
+            </div>
+            <div style="display:flex; gap:.7rem; margin-top:1rem;">
+                <button type="submit" class="btn-primary">Guardar Alterações</button>
+                <button type="button" class="btn-outline" onclick="fecharEditarLocal()">Cancelar</button>
             </div>
         </form>
     </div>
@@ -463,6 +539,28 @@ document.getElementById('modalSearch').addEventListener('keypress', e => {
 });
 document.getElementById('modalLocal').addEventListener('click', function(e){
     if (e.target===this) fecharModal();
+});
+
+/* ── Renomear dia (toggle do formulário inline) ── */
+function toggleRename(diaPk) {
+    const f = document.getElementById('rename-' + diaPk);
+    f.style.display = f.style.display === 'none' ? 'flex' : 'none';
+    if (f.style.display === 'flex') f.querySelector('input').focus();
+}
+
+/* ── Editar local (modal) ── */
+function abrirEditarLocal(localPk, nome, tipo, notas) {
+    document.getElementById('formEditarLocal').action = `/local/${localPk}/editar/`;
+    document.getElementById('editNome').value  = nome;
+    document.getElementById('editTipo').value  = tipo;
+    document.getElementById('editNotas').value = notas;
+    document.getElementById('modalEditarLocal').classList.add('open');
+}
+function fecharEditarLocal() {
+    document.getElementById('modalEditarLocal').classList.remove('open');
+}
+document.getElementById('modalEditarLocal').addEventListener('click', function(e){
+    if (e.target===this) fecharEditarLocal();
 });
 </script>
 {% endblock %}

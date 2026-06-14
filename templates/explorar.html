@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block title %}Explorar Roteiros — GeoRota{% endblock %}
+
+{% block extra_head %}
+<style>
+.explorar-wrap { max-width: 1000px; margin: 2.5rem auto; padding: 0 1.5rem; }
+.explorar-head { margin-bottom: 1.8rem; }
+.explorar-head h1 { font-family: var(--font-display); font-size: 1.6rem; color: var(--text); }
+.explorar-head p { color: var(--text-muted); font-size: .9rem; margin-top: .3rem; }
+.explorar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+.pub-card {
+    background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg);
+    padding: 1.2rem 1.3rem; text-decoration: none; color: inherit;
+    display: flex; flex-direction: column; gap: .55rem;
+    transition: border-color .2s, transform .15s;
+}
+.pub-card:hover { border-color: var(--green); transform: translateY(-2px); }
+.pub-titulo { font-size: 1rem; font-weight: 700; color: var(--text); font-family: var(--font-display); }
+.pub-autor { display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: var(--text-muted); }
+.pub-avatar { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.pub-avatar-ini {
+    width: 26px; height: 26px; border-radius: 50%; background: var(--green); color: #fff;
+    display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: .72rem; flex-shrink: 0;
+}
+.pub-meta { display: flex; gap: .9rem; font-size: .77rem; color: var(--text-muted); margin-top: .2rem; }
+.pub-desc { font-size: .82rem; color: var(--text-muted); line-height: 1.4; }
+.explorar-vazio { text-align: center; padding: 3.5rem 1.5rem; color: var(--text-muted); }
+.explorar-vazio .icon { font-size: 3rem; margin-bottom: .8rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="explorar-wrap">
+    <div class="explorar-head">
+        <h1>🌍 Explorar Roteiros</h1>
+        <p>Roteiros públicos partilhados por outros utilizadores.</p>
+    </div>
+
+    {% if roteiros %}
+    <div class="explorar-grid">
+        {% for r in roteiros %}
+        <a href="{% url 'roteiro_publico' r.pk %}" class="pub-card">
+            <div class="pub-titulo">{{ r.titulo }}</div>
+            <div class="pub-autor">
+                {% if r.utilizador.perfil.foto %}
+                    <img src="{{ r.utilizador.perfil.foto.url }}" class="pub-avatar" alt="">
+                {% else %}
+                    <span class="pub-avatar-ini">{{ r.utilizador.first_name|default:r.utilizador.username|first|upper }}</span>
+                {% endif %}
+                por {{ r.utilizador.first_name|default:r.utilizador.username }}
+            </div>
+            {% if r.descricao %}<p class="pub-desc">{{ r.descricao|truncatechars:90 }}</p>{% endif %}
+            <div class="pub-meta">
+                <span>🗓️ {{ r.dias.count }} dia(s)</span>
+                <span>📅 {{ r.data_criacao|date:"d/m/Y" }}</span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="explorar-vazio">
+        <div class="icon">🗺️</div>
+        <h3>Ainda não há roteiros públicos</h3>
+        <p>Torna um dos teus roteiros público (em Editar Roteiro) para apareceres aqui.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

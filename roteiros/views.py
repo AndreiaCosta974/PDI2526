@@ -17,6 +17,7 @@ def criar_roteiro(request):
             utilizador=request.user,
             titulo=titulo,
             descricao=descricao,
+            data_viagem=request.POST.get('data_viagem') or None,
         )
         messages.success(request, 'Roteiro criado!')
         return redirect('detalhe_roteiro', pk=roteiro.pk)
@@ -53,6 +54,8 @@ def editar_roteiro(request, pk):
     if request.method == 'POST':
         roteiro.titulo = request.POST.get('titulo')
         roteiro.descricao = request.POST.get('descricao', '')
+        roteiro.data_viagem = request.POST.get('data_viagem') or None
+        roteiro.publico = request.POST.get('publico') == 'on'
         roteiro.save()
         messages.success(request, 'Roteiro atualizado!')
         return redirect('detalhe_roteiro', pk=pk)
@@ -79,6 +82,66 @@ def adicionar_dia(request, roteiro_pk):
         Dia.objects.create(roteiro=roteiro, numero=numero, titulo=titulo)
         messages.success(request, f'Dia {numero} adicionado!')
     return redirect('detalhe_roteiro', pk=roteiro_pk)
+
+
+@login_required
+def editar_dia(request, dia_pk):
+    dia = get_object_or_404(Dia, pk=dia_pk, roteiro__utilizador=request.user)
+    if request.method == 'POST':
+        dia.titulo = request.POST.get('titulo', '')
+        dia.save()
+        messages.success(request, 'Dia atualizado!')
+    return redirect('detalhe_roteiro', pk=dia.roteiro.pk)
+
+
+@login_required
+def eliminar_dia(request, dia_pk):
+    dia = get_object_or_404(Dia, pk=dia_pk, roteiro__utilizador=request.user)
+    roteiro_pk = dia.roteiro.pk
+    if request.method == 'POST':
+        dia.delete()
+        messages.success(request, 'Dia eliminado.')
+    return redirect('detalhe_roteiro', pk=roteiro_pk)
+
+
+@login_required
+def mover_dia(request, dia_pk, direcao):
+    dia = get_object_or_404(Dia, pk=dia_pk, roteiro__utilizador=request.user)
+    dias = list(dia.roteiro.dias.order_by('numero'))
+    idx = dias.index(dia)
+    troca = idx - 1 if direcao == 'cima' else idx + 1
+    if 0 <= troca < len(dias):
+        outro = dias[troca]
+        dia.numero, outro.numero = outro.numero, dia.numero
+        dia.save()
+        outro.save()
+    return redirect('detalhe_roteiro', pk=dia.roteiro.pk)
+
+
+@login_required
+def mover_local(request, local_pk, direcao):
+    local = get_object_or_404(Local, pk=local_pk, dia__roteiro__utilizador=request.user)
+    locais = list(local.dia.locais.order_by('ordem'))
+    idx = locais.index(local)
+    troca = idx - 1 if direcao == 'cima' else idx + 1
+    if 0 <= troca < len(locais):
+        outro = locais[troca]
+        local.ordem, outro.ordem = outro.ordem, local.ordem
+        local.save()
+        outro.save()
+    return redirect('detalhe_roteiro', pk=local.dia.roteiro.pk)
+
+
+@login_required
+def editar_local(request, local_pk):
+    local = get_object_or_404(Local, pk=local_pk, dia__roteiro__utilizador=request.user)
+    if request.method == 'POST':
+        local.nome = request.POST.get('nome', local.nome)
+        local.tipo = request.POST.get('tipo', local.tipo)
+        local.notas = request.POST.get('notas', '')
+        local.save()
+        messages.success(request, 'Local atualizado!')
+    return redirect('detalhe_roteiro', pk=local.dia.roteiro.pk)
 
 
 @login_required
@@ -117,22 +180,38 @@ def guardar_rota_mapa(request):
         distancia = data.get('distancia', '')
         tempo = data.get('tempo', '')
 
-        descricao = f"Rota criada a partir do mapa. Distância: {distancia}, Tempo estimado: {tempo}."
+        partes = ['Rota criada a partir do mapa.']
+        if distancia:
+            partes.append(f'Distância: {distancia}.')
+        if tempo:
+            partes.append(f'Tempo estimado: {tempo}.')
+        descricao = ' '.join(partes)
+
         roteiro = Roteiro.objects.create(
             utilizador=request.user,
             titulo=titulo,
             descricao=descricao,
         )
-        dia = Dia.objects.create(roteiro=roteiro, numero=1, titulo='Dia 1')
+
+        # Agrupar os pontos por dia — cada número de dia cria um Dia próprio
+        dias_cache = {}
+        ordem_por_dia = {}
         for i, wp in enumerate(waypoints):
+            numero = int(wp.get('dia', 1) or 1)
+            if numero not in dias_cache:
+                dias_cache[numero] = Dia.objects.create(
+                    roteiro=roteiro, numero=numero, titulo=f'Dia {numero}'
+                )
+                ordem_por_dia[numero] = 0
+            ordem_por_dia[numero] += 1
             Local.objects.create(
-                dia=dia,
+                dia=dias_cache[numero],
                 nome=wp.get('nome', f'Ponto {i + 1}'),
                 tipo='turismo',
                 latitude=wp['lat'],
                 longitude=wp['lng'],
                 notas='',
-                ordem=i + 1,
+                ordem=ordem_por_dia[numero],
             )
         return JsonResponse({'ok': True, 'roteiro_pk': roteiro.pk})
     return JsonResponse({'ok': False}, status=400)

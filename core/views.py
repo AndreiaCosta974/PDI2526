@@ -1,14 +1,66 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib import messages
 from roteiros.models import Roteiro, Local, Dia
 from django.conf import settings
+from datetime import date
 import json
+
+# tipos válidos no modelo Local (para validar ao copiar exemplos)
+TIPOS_VALIDOS = {c[0] for c in Local.TIPO_CHOICES}
 
 
 def home(request):
     return render(request, 'home.html')
+
+
+@login_required
+def perfil(request):
+    from .models import Perfil
+    perfil_obj, _ = Perfil.objects.get_or_create(user=request.user)
+    if request.method == 'POST':
+        request.user.first_name = request.POST.get('first_name', '')
+        request.user.last_name = request.POST.get('last_name', '')
+        request.user.email = request.POST.get('email', '')
+        request.user.save()
+        if request.FILES.get('foto'):
+            perfil_obj.foto = request.FILES['foto']
+            perfil_obj.save()
+        messages.success(request, 'Perfil atualizado!')
+        return redirect('perfil')
+    return render(request, 'perfil.html', {
+        'perfil': perfil_obj,
+        'total_roteiros': Roteiro.objects.filter(utilizador=request.user).count(),
+    })
+
+
+@login_required
+def explorar(request):
+    roteiros = (
+        Roteiro.objects.filter(publico=True)
+        .select_related('utilizador')
+        .order_by('-data_criacao')
+    )
+    return render(request, 'explorar.html', {'roteiros': roteiros})
+
+
+@login_required
+def roteiro_publico(request, pk):
+    roteiro = get_object_or_404(
+        Roteiro.objects.prefetch_related('dias__locais'), pk=pk, publico=True
+    )
+    locais_json = [
+        {'nome': local.nome, 'lat': local.latitude, 'lng': local.longitude,
+         'tipo': local.tipo, 'dia': dia.numero}
+        for dia in roteiro.dias.all()
+        for local in dia.locais.all()
+    ]
+    return render(request, 'roteiro_publico.html', {
+        'roteiro': roteiro,
+        'locais_json': json.dumps(locais_json),
+        'eh_dono': roteiro.utilizador_id == request.user.id,
+    })
 
 
 def register(request):
@@ -31,7 +83,7 @@ ROTEIROS_EXEMPLO = [
     {
         'slug': 'bangkok-thailand',
         'titulo': 'Bangkok em 4 Dias',
-        'emoji': '🏛️',
+        'emoji': '🇹🇭',
         'descricao': 'Grand Palace, Templos milenares, mercados vibrantes e vida noturna agitada.',
         'destino': 'Bangkok, Tailândia',
         'dias': [
@@ -70,7 +122,7 @@ ROTEIROS_EXEMPLO = [
     {
         'slug': 'hong-kong-china',
         'titulo': 'Hong Kong em 3 Dias',
-        'emoji': '🍷',
+        'emoji': '🇭🇰',
         'descricao': 'A união perfeita entre arranha-céus futuristas, tradição e vistas deslumbrantes.',
         'destino': 'Hong Kong, China',
         'dias': [
@@ -101,7 +153,7 @@ ROTEIROS_EXEMPLO = [
     {
         'slug': 'macau-china',
         'titulo': 'Macau em 2 Dias',
-        'emoji': '博彩',
+        'emoji': '🇲🇴',
         'descricao': 'Herança portuguesa, arquitetura histórica e grandiosidade da Las Vegas da Ásia.',
         'destino': 'Macau, China',
         'dias': [
@@ -125,8 +177,8 @@ ROTEIROS_EXEMPLO = [
     },
     {
         'slug': 'singapura',
-        'titulo': 'Singapura em 3 Dia',
-        'emoji': '�',
+        'titulo': 'Singapura em 3 Dias',
+        'emoji': '🇸🇬',
         'descricao': 'Cidade-estado do futuro com jardins incriveis, cascatas interiores e luxo.',
         'destino': 'Singapura',
         'dias': [
@@ -1026,19 +1078,99 @@ ROTEIROS_EXEMPLO = [
     },
 ]
 
+# Continente de cada roteiro de exemplo (por slug)
+CONTINENTES = {
+    'bangkok-thailand': 'Ásia',
+    'hong-kong-china': 'Ásia',
+    'macau-china': 'Ásia',
+    'singapura': 'Ásia',
+    'kuala-lumpur-malasia': 'Ásia',
+    'londres-reino-unido': 'Europa',
+    'paris-franca': 'Europa',
+    'istambul-turquia': 'Europa',
+    'roma-italia': 'Europa',
+    'madrid-espanha': 'Europa',
+    'marraquexe-marrocos': 'África',
+    'cairo-egito': 'África',
+    'joanesburgo-africa-do-sul': 'África',
+    'cidade-do-cabo-africa-do-sul': 'África',
+    'casablanca-marrocos': 'África',
+    'nova-iorque-eua': 'América do Norte',
+    'cancun-mexico': 'América do Norte',
+    'cidade-do-mexico-mexico': 'América do Norte',
+    'los-angeles-eua': 'América do Norte',
+    'orlando-eua': 'América do Norte',
+    'buenos-aires-argentina': 'América do Sul',
+    'rio-de-janeiro-brasil': 'América do Sul',
+    'lima-peru': 'América do Sul',
+    'sao-paulo-brasil': 'América do Sul',
+    'cartagena-colombia': 'América do Sul',
+    'sydney-australia': 'Oceânia',
+    'melbourne-australia': 'Oceânia',
+    'auckland-nova-zelandia': 'Oceânia',
+    'brisbane-gold-coast-australia': 'Oceânia',
+    'queenstown-nova-zelandia': 'Oceânia',
+}
+
+# Ordem dos continentes a mostrar nos botões de filtro
+ORDEM_CONTINENTES = ['Europa', 'Ásia', 'África', 'América do Norte', 'América do Sul', 'Oceânia']
+
+
 @login_required
 def dashboard(request):
     roteiros = Roteiro.objects.filter(utilizador=request.user).order_by('-data_criacao')
     total_locais = Local.objects.filter(dia__roteiro__utilizador=request.user).count()
     total_dias = Dia.objects.filter(roteiro__utilizador=request.user).count()
+
+    # Próxima viagem agendada (com data no futuro)
+    hoje = date.today()
+    proxima = (
+        roteiros.filter(data_viagem__gte=hoje).order_by('data_viagem').first()
+    )
+    dias_proxima = (proxima.data_viagem - hoje).days if proxima else None
+
     return render(request, 'dashboard.html', {
         'roteiros': roteiros,
         'total_locais': total_locais if total_locais > 0 else '—',
         'total_dias': total_dias if total_dias > 0 else '—',
+        'proxima_viagem': proxima,
+        'dias_proxima': dias_proxima,
         'roteiros_exemplo': [
-            {**r, 'total_locais': _total_locais(r)} for r in ROTEIROS_EXEMPLO
+            {**r, 'total_locais': _total_locais(r), 'continente': CONTINENTES.get(r['slug'], 'Outros')}
+            for r in ROTEIROS_EXEMPLO
         ],
+        'continentes': ORDEM_CONTINENTES,
     })
+
+
+@login_required
+def copiar_exemplo(request, slug):
+    exemplo = next((r for r in ROTEIROS_EXEMPLO if r['slug'] == slug), None)
+    if exemplo is None:
+        from django.http import Http404
+        raise Http404
+    roteiro = Roteiro.objects.create(
+        utilizador=request.user,
+        titulo=exemplo['titulo'],
+        descricao=exemplo.get('descricao', ''),
+    )
+    for d in exemplo['dias']:
+        dia = Dia.objects.create(
+            roteiro=roteiro, numero=d['numero'], titulo=d.get('titulo', ''),
+        )
+        for i, local in enumerate(d['locais']):
+            tipo = local.get('tipo', 'turismo')
+            Local.objects.create(
+                dia=dia,
+                nome=local['nome'],
+                tipo=tipo if tipo in TIPOS_VALIDOS else 'outro',
+                latitude=local['lat'],
+                longitude=local['lng'],
+                notas=local.get('notas', ''),
+                ordem=i + 1,
+            )
+    messages.success(request, f'Roteiro "{exemplo["titulo"]}" copiado para os teus roteiros!')
+    return redirect('detalhe_roteiro', pk=roteiro.pk)
 
 
 @login_required
@@ -1077,6 +1209,7 @@ def mapa(request):
                         'lat': local.latitude,
                         'lng': local.longitude,
                         'nome': local.nome,
+                        'dia': dia.numero,
                     })
             waypoints_json = json.dumps(waypoints)
         except Roteiro.DoesNotExist:

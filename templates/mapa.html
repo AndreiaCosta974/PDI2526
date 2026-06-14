@@ -181,7 +181,23 @@ body { overflow: hidden; }
     background: rgba(255,255,255,.07);
 }
 .geo-wp-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-.geo-wp-name { flex: 1; font-size: .8rem; color: rgba(255,255,255,.85); font-family: 'DM Sans', sans-serif; }
+.geo-wp-name { flex: 1; font-size: .8rem; color: rgba(255,255,255,.85); font-family: 'DM Sans', sans-serif; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.geo-wp-dia {
+    background: rgba(255,255,255,.1); color: #fff;
+    border: 1px solid rgba(255,255,255,.18); border-radius: 6px;
+    font-size: .72rem; padding: .15rem .25rem; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; flex-shrink: 0; outline: none;
+}
+.geo-wp-dia option { color: #000; }
+.geo-add-dia {
+    width: 100%; margin-top: .45rem;
+    background: rgba(94,200,184,.15); color: #5ec8b8;
+    border: 1px dashed rgba(94,200,184,.5); border-radius: 8px;
+    padding: .42rem; font-family: 'DM Sans', sans-serif;
+    font-size: .78rem; font-weight: 600; cursor: pointer;
+    transition: background .2s;
+}
+.geo-add-dia:hover { background: rgba(94,200,184,.25); }
 .geo-wp-remove {
     background: none; border: none; cursor: pointer;
     color: rgba(255,255,255,.35); font-size: .88rem;
@@ -431,11 +447,39 @@ let searchMarkers = [];
 let routeLayer    = null;
 let transportMode = 'drive';
 let centerLatLng  = null;
+let numDias       = 1;     // nº de dias disponíveis para distribuir os pontos
+let rotaDist      = '';    // última distância calculada
+let rotaTempo     = '';    // último tempo calculado
+let wpMarkers     = [];    // marcadores dos pontos no mapa
+
+function geoDiaCor(dia) {
+    const cores = ['#2a7c6f','#3b82f6','#f97316','#a855f7','#ef4444','#eab308','#14b8a6'];
+    return cores[(dia - 1) % cores.length];
+}
+function geoIconWp(dia, label) {
+    return L.divIcon({
+        className: '',
+        html: `<div style="background:${geoDiaCor(dia)};color:#fff;width:24px;height:24px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.4);border:2px solid #fff"><span style="transform:rotate(45deg);font-size:.7rem;font-weight:700">${label}</span></div>`,
+        iconSize: [24, 24], iconAnchor: [12, 24]
+    });
+}
+function geoRenderMarkers() {
+    wpMarkers.forEach(m => mapa.removeLayer(m));
+    wpMarkers = [];
+    waypoints.forEach((w, i) => {
+        wpMarkers.push(
+            L.marker([w.lat, w.lng], { icon: geoIconWp(w.dia, i + 1) })
+                .addTo(mapa)
+                .bindPopup(`<b>${w.nome}</b><br><small>Dia ${w.dia}</small>`)
+        );
+    });
+}
 
 mapa.on('click', e => geoAddWp(e.latlng.lat, e.latlng.lng, `Ponto ${waypoints.length + 1}`));
 
 if (WAYPOINTS_INICIAIS.length > 0) {
-    WAYPOINTS_INICIAIS.forEach(wp => geoAddWp(wp.lat, wp.lng, wp.nome));
+    numDias = Math.max(1, ...WAYPOINTS_INICIAIS.map(wp => wp.dia || 1));
+    WAYPOINTS_INICIAIS.forEach(wp => geoAddWp(wp.lat, wp.lng, wp.nome, wp.dia || 1));
     if (ROTEIRO_TITULO) geoToast(`🗺️ Roteiro carregado: ${ROTEIRO_TITULO}`);
     setTimeout(() => {
         if (waypoints.length > 0) {
@@ -517,21 +561,32 @@ async function geoBuscarPOI(tipo) {
     finally { geoLoading(false); }
 }
 
-function geoAddWp(lat, lng, nome) {
-    waypoints.push({lat,lng,nome}); geoRenderWp();
-    geoToast(`📍 ${nome} adicionado`);
+function geoAddWp(lat, lng, nome, dia) {
+    waypoints.push({lat, lng, nome, dia: dia || numDias}); geoRenderWp();
+    geoToast(`📍 ${nome} adicionado (Dia ${dia || numDias})`);
 }
 function geoRemWp(i) { waypoints.splice(i,1); geoRenderWp(); }
+function geoSetWpDia(i, dia) { waypoints[i].dia = parseInt(dia); geoRenderWp(); }
+function geoNovoDia() {
+    numDias++; geoRenderWp();
+    geoToast(`📅 Dia ${numDias} criado — os próximos pontos vão para este dia`);
+}
 function geoRenderWp() {
     const lista=document.getElementById('geoWaypointsList'), hint=document.getElementById('geoWpHint');
+    geoRenderMarkers();
     if (!waypoints.length) { lista.innerHTML=''; hint.style.display='block'; return; }
     hint.style.display='none';
-    lista.innerHTML=waypoints.map((w,i)=>`
+    lista.innerHTML=waypoints.map((w,i)=>{
+        let opts='';
+        for (let d=1; d<=numDias; d++) opts+=`<option value="${d}" ${w.dia===d?'selected':''}>Dia ${d}</option>`;
+        return `
         <div class="geo-wp-item">
-            <div class="geo-wp-dot" style="background:${i===0?'#2a7c6f':i===waypoints.length-1?'#e74c3c':'#3b82f6'}"></div>
+            <div class="geo-wp-dot" style="background:${geoDiaCor(w.dia)}"></div>
             <span class="geo-wp-name">${w.nome}</span>
+            <select class="geo-wp-dia" onchange="geoSetWpDia(${i}, this.value)">${opts}</select>
             <button class="geo-wp-remove" onclick="geoRemWp(${i})">✕</button>
-        </div>`).join('');
+        </div>`;
+    }).join('') + `<button class="geo-add-dia" onclick="geoNovoDia()">＋ Novo dia</button>`;
 }
 
 async function geoCalcularRota() {
@@ -544,49 +599,68 @@ async function geoCalcularRota() {
         return;
     }
 
+    // Agrupar os pontos por dia — cada dia é uma rota independente
+    const porDia = {};
+    waypoints.forEach(w => { (porDia[w.dia] = porDia[w.dia] || []).push(w); });
+    const dias = Object.keys(porDia).map(Number).sort((a, b) => a - b);
+
+    if (!dias.some(d => porDia[d].length >= 2)) {
+        geoToast('Cada dia precisa de pelo menos 2 pontos para traçar a rota.');
+        return;
+    }
+
     geoLoading(true);
     if (routeLayer) mapa.removeLayer(routeLayer);
+    routeLayer = L.layerGroup().addTo(mapa);
 
-    // Formato correto da API Geoapify: lat,lng separados por |
-    const coords = waypoints.map(w => `${w.lat},${w.lng}`).join('|');
-    const url = `https://api.geoapify.com/v1/routing?waypoints=${coords}&mode=${transportMode}&apiKey=${API_KEY}`;
+    let totalDist = 0, totalTime = 0;
+    const bounds = [];
+    const errosDias = [];
 
-    try {
-        const res  = await fetch(url);
-        const data = await res.json();
+    for (const d of dias) {
+        const pts = porDia[d];
+        pts.forEach(p => bounds.push([p.lat, p.lng]));
+        if (pts.length < 2) continue;  // dia com 1 ponto não tem rota
 
-        // Verificar erros da API
-        if (data.statusCode && data.statusCode !== 200) {
-            geoToast(`Erro API: ${data.message || 'Verifica a API key.'}`);
-            geoLoading(false);
-            return;
-        }
-
-        if (data.features && data.features.length > 0) {
-            routeLayer = L.geoJSON(data, {
-                style: { color: '#2a7c6f', weight: 5, opacity: 0.85 }
-            }).addTo(mapa);
-            mapa.fitBounds(routeLayer.getBounds(), { padding: [40, 40] });
-
+        const coords = pts.map(w => `${w.lat},${w.lng}`).join('|');
+        const url = `https://api.geoapify.com/v1/routing?waypoints=${coords}&mode=${transportMode}&apiKey=${API_KEY}`;
+        try {
+            const res  = await fetch(url);
+            const data = await res.json();
+            if ((data.statusCode && data.statusCode !== 200) || !data.features || !data.features.length) {
+                errosDias.push(d);
+                continue;
+            }
+            L.geoJSON(data, { style: { color: geoDiaCor(d), weight: 5, opacity: 0.85 } }).addTo(routeLayer);
             const props = data.features[0].properties;
-            const distKm = (props.distance / 1000).toFixed(1);
-            const timeMin = Math.round(props.time / 60);
-            const timeStr = timeMin >= 60
-                ? `${Math.floor(timeMin/60)}h ${timeMin%60}min`
-                : `${timeMin} min`;
-
-            document.getElementById('geoRouteDist').textContent = distKm + ' km';
-            document.getElementById('geoRouteTime').textContent = timeStr;
-            document.getElementById('geoRouteInfo').style.display = 'block';
-            geoToast(`✅ Rota: ${distKm} km · ${timeStr}`);
-        } else {
-            geoToast('Não foi possível calcular a rota entre estes pontos.');
+            totalDist += props.distance;
+            totalTime += props.time;
+        } catch (err) {
+            console.error(`Erro rota dia ${d}:`, err);
+            errosDias.push(d);
         }
-    } catch (err) {
-        console.error('Erro rota:', err);
-        geoToast('Erro de ligação ao calcular rota.');
-    } finally {
-        geoLoading(false);
+    }
+
+    geoLoading(false);
+    if (bounds.length) mapa.fitBounds(bounds, { padding: [40, 40] });
+
+    if (totalDist > 0) {
+        const distKm = (totalDist / 1000).toFixed(1);
+        const timeMin = Math.round(totalTime / 60);
+        const timeStr = timeMin >= 60 ? `${Math.floor(timeMin/60)}h ${timeMin%60}min` : `${timeMin} min`;
+        rotaDist = distKm + ' km';
+        rotaTempo = timeStr;
+        document.getElementById('geoRouteDist').textContent = rotaDist;
+        document.getElementById('geoRouteTime').textContent = rotaTempo;
+        document.getElementById('geoRouteInfo').style.display = 'block';
+    }
+
+    if (errosDias.length && totalDist > 0) {
+        geoToast(`⚠️ Dia(s) ${errosDias.join(', ')} sem ligação por estrada (pontos muito distantes). Restantes calculados: ${rotaDist} · ${rotaTempo}`);
+    } else if (errosDias.length) {
+        geoToast(`⚠️ Não foi possível ligar os pontos por estrada. Estão muito distantes ou em zonas sem estrada (ex: mar). Aproxima os pontos.`);
+    } else {
+        geoToast(`✅ Rota: ${rotaDist} · ${rotaTempo}`);
     }
 }
 
@@ -609,6 +683,7 @@ function geoMinhaLoc() {
 function geoClearRoute() {
     if (routeLayer) { mapa.removeLayer(routeLayer); routeLayer = null; }
     waypoints = [];
+    numDias = 1; rotaDist = ''; rotaTempo = '';
     geoRenderWp();
     document.getElementById('geoRouteInfo').style.display = 'none';
     geoToast('Rota limpa.');
@@ -617,6 +692,7 @@ function geoClearRoute() {
 function geoLimpar() {
     waypoints=[]; poiMarkers.forEach(m=>mapa.removeLayer(m)); searchMarkers.forEach(m=>mapa.removeLayer(m));
     poiMarkers=[]; searchMarkers=[];
+    numDias = 1; rotaDist = ''; rotaTempo = '';
     if(routeLayer) mapa.removeLayer(routeLayer); routeLayer=null;
     geoRenderWp(); document.getElementById('geoRouteInfo').style.display='none';
     document.querySelectorAll('.sb-tag').forEach(b=>b.classList.remove('active'));
@@ -664,11 +740,11 @@ async function geoConfirmarGuardar() {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': '{{ csrf_token }}',
             },
-            body: JSON.stringify({ titulo, waypoints }),
+            body: JSON.stringify({ titulo, waypoints, distancia: rotaDist, tempo: rotaTempo }),
         });
         const data = await res.json();
         if (data.ok) {
-            window.location.href = '/dashboard/';
+            window.location.href = data.roteiro_pk ? `/roteiro/${data.roteiro_pk}/` : '/dashboard/';
         } else {
             geoToast('Erro ao guardar o roteiro.');
         }

@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% block title %}O Meu Perfil — GeoRota{% endblock %}
+
+{% block content %}
+<div style="max-width:560px; margin:3rem auto; padding:0 1rem;">
+    <div style="background:#fff; border:1px solid var(--border); border-radius:var(--radius-lg); padding:2.2rem 2.5rem; box-shadow:var(--shadow);">
+
+        <h1 style="font-family:var(--font-display); font-size:1.4rem; color:var(--text); margin-bottom:.4rem;">O Meu Perfil</h1>
+        <p style="font-size:.85rem; color:var(--text-muted); margin-bottom:1.8rem;">Gere os teus dados e a tua foto.</p>
+
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <!-- Avatar -->
+            <div style="display:flex; align-items:center; gap:1.2rem; margin-bottom:1.6rem;">
+                {% if perfil.foto %}
+                    <img id="avatarPreview" src="{{ perfil.foto.url }}" alt="foto"
+                        style="width:84px; height:84px; border-radius:50%; object-fit:cover; border:2px solid var(--border);">
+                {% else %}
+                    <span id="avatarPreview" style="width:84px; height:84px; border-radius:50%; background:var(--green); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:2rem;">{{ user.first_name|default:user.username|first|upper }}</span>
+                {% endif %}
+                <div>
+                    <label for="fotoInput" class="btn-outline btn-sm" style="cursor:pointer;">📷 Mudar foto</label>
+                    <input type="file" name="foto" id="fotoInput" accept="image/*" style="display:none;" onchange="preverFoto(this)">
+                    <p style="font-size:.75rem; color:var(--text-muted); margin-top:.4rem;">JPG ou PNG.</p>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label style="font-size:.85rem; font-weight:600; color:var(--text); display:block; margin-bottom:.4rem;">Nome de utilizador</label>
+                <input type="text" value="{{ user.username }}" disabled
+                    style="width:100%; box-sizing:border-box; padding:.65rem 1rem; border:1.5px solid var(--border); border-radius:var(--radius); background:#eef2f1; color:var(--text-muted); font-family:var(--font-body); font-size:.95rem;">
+            </div>
+
+            <div style="display:flex; gap:.8rem; margin-top:1.1rem;">
+                <div class="form-group" style="flex:1;">
+                    <label style="font-size:.85rem; font-weight:600; color:var(--text); display:block; margin-bottom:.4rem;">Nome</label>
+                    <input type="text" name="first_name" value="{{ user.first_name }}" placeholder="Primeiro nome"
+                        style="width:100%; box-sizing:border-box; padding:.65rem 1rem; border:1.5px solid var(--border); border-radius:var(--radius); background:#f8faf9; font-family:var(--font-body); font-size:.95rem; color:var(--text);">
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label style="font-size:.85rem; font-weight:600; color:var(--text); display:block; margin-bottom:.4rem;">Apelido</label>
+                    <input type="text" name="last_name" value="{{ user.last_name }}" placeholder="Apelido"
+                        style="width:100%; box-sizing:border-box; padding:.65rem 1rem; border:1.5px solid var(--border); border-radius:var(--radius); background:#f8faf9; font-family:var(--font-body); font-size:.95rem; color:var(--text);">
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top:1.1rem;">
+                <label style="font-size:.85rem; font-weight:600; color:var(--text); display:block; margin-bottom:.4rem;">Email</label>
+                <input type="email" name="email" value="{{ user.email }}" placeholder="email@exemplo.com"
+                    style="width:100%; box-sizing:border-box; padding:.65rem 1rem; border:1.5px solid var(--border); border-radius:var(--radius); background:#f8faf9; font-family:var(--font-body); font-size:.95rem; color:var(--text);">
+            </div>
+
+            <div style="background:var(--green-light); border-radius:var(--radius); padding:.8rem 1rem; margin-top:1.4rem; font-size:.85rem; color:var(--green-dark);">
+                📌 Tens <strong>{{ total_roteiros }}</strong> roteiro(s) criado(s).
+            </div>
+
+            <div style="display:flex; gap:.8rem; margin-top:1.8rem;">
+                <button type="submit" class="btn-primary" style="flex:1;">Guardar Alterações</button>
+                <a href="{% url 'dashboard' %}" class="btn-outline" style="flex:1; text-align:center; line-height:2.4;">Voltar</a>
+            </div>
+        </form>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function preverFoto(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = e => {
+            const atual = document.getElementById('avatarPreview');
+            const img = document.createElement('img');
+            img.id = 'avatarPreview';
+            img.src = e.target.result;
+            img.style.cssText = 'width:84px;height:84px;border-radius:50%;object-fit:cover;border:2px solid var(--border);';
+            atual.replaceWith(img);
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+</script>
+{% endblock %}

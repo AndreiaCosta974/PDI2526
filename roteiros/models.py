@@ -5,6 +5,8 @@ class Roteiro(models.Model):
     utilizador = models.ForeignKey(User, on_delete=models.CASCADE, related_name='roteiros')
     titulo = models.CharField(max_length=200)
     descricao = models.TextField(blank=True)
+    data_viagem = models.DateField(null=True, blank=True)
+    publico = models.BooleanField(default=False)
     data_criacao = models.DateTimeField(auto_now_add=True)
     data_atualizacao = models.DateTimeField(auto_now=True)
 

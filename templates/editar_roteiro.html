@@ -20,12 +20,29 @@
             </div>
 
             <div class="form-group" style="margin-top:1.1rem;">
+                <label style="font-size:.85rem; font-weight:600; color:var(--text); display:block; margin-bottom:.4rem;">Data da viagem</label>
+                <input type="date" name="data_viagem" value="{{ roteiro.data_viagem|date:'Y-m-d' }}"
+                    style="width:100%; box-sizing:border-box; padding:.65rem 1rem;
+                           border:1.5px solid var(--border); border-radius:var(--radius);
+                           background:#f8faf9; font-family:var(--font-body); font-size:.95rem; color:var(--text);">
+                <small style="color:var(--text-muted); font-size:.78rem;">Usada no contador "dias até à próxima viagem" no dashboard.</small>
+            </div>
+
+            <div class="form-group" style="margin-top:1.1rem;">
                 <label style="font-size:.85rem; font-weight:600; color:var(--text); display:block; margin-bottom:.4rem;">Notas</label>
                 <textarea name="descricao" rows="4" placeholder="Descreve os teus planos, dicas, notas..."
                     style="width:100%; box-sizing:border-box; padding:.65rem 1rem;
                            border:1.5px solid var(--border); border-radius:var(--radius);
                            background:#f8faf9; font-family:var(--font-body); font-size:.9rem;
                            color:var(--text); resize:vertical;">{{ roteiro.descricao }}</textarea>
+            </div>
+
+            <div class="form-group" style="margin-top:1.1rem;">
+                <label style="display:flex; align-items:center; gap:.6rem; cursor:pointer; font-size:.9rem; color:var(--text);">
+                    <input type="checkbox" name="publico" {% if roteiro.publico %}checked{% endif %}
+                        style="width:18px; height:18px; cursor:pointer;">
+                    Tornar este roteiro <strong>público</strong> (visível a outros utilizadores na página Explorar)
+                </label>
             </div>
 
             <div style="display:flex; gap:.8rem; margin-top:1.8rem;">

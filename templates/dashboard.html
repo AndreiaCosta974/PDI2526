@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% block title %}Dashboard — GeoRota{% endblock %}
+{% block title %}Painel — GeoRota{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -160,6 +160,18 @@
     border-radius: 99px; padding: .15rem .6rem; align-self: flex-start;
 }
 
+/* Filtros por continente */
+.exemplo-filtros { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.2rem; }
+.filtro-cont {
+    background: var(--white); border: 1.5px solid var(--border);
+    color: var(--text); border-radius: 99px;
+    padding: .4rem .9rem; font-size: .8rem; font-weight: 600;
+    font-family: var(--font-body); cursor: pointer;
+    transition: all .15s;
+}
+.filtro-cont:hover { border-color: var(--green); color: var(--green-dark); }
+.filtro-cont.active { background: var(--green); border-color: var(--green); color: #fff; }
+
 /* Responsive */
 @media (max-width: 960px) {
     .dash-page { grid-template-columns: 1fr; }
@@ -240,10 +252,18 @@
         <!-- Roteiros de Exemplo -->
         <div class="exemplo-section">
             <h2 class="roteiros-title">Sugestões de Roteiros</h2>
-            <p class="exemplo-subtitle">Explora estes roteiros de exemplo e usa-os como ponto de partida.</p>
+            <p class="exemplo-subtitle">Escolhe um continente e explora os roteiros de exemplo.</p>
+
+            <div class="exemplo-filtros">
+                <button class="filtro-cont active" onclick="filtrarContinente('todos', this)">🌍 Todos</button>
+                {% for cont in continentes %}
+                <button class="filtro-cont" onclick="filtrarContinente('{{ cont }}', this)">{{ cont }}</button>
+                {% endfor %}
+            </div>
+
             <div class="exemplo-grid">
                 {% for ex in roteiros_exemplo %}
-                <a href="{% url 'detalhe_exemplo' ex.slug %}" class="exemplo-card">
+                <a href="{% url 'detalhe_exemplo' ex.slug %}" class="exemplo-card" data-continente="{{ ex.continente }}">
                     <div class="exemplo-header">
                         <span class="exemplo-emoji">{{ ex.emoji }}</span>
                         <div>
@@ -271,10 +291,27 @@
 
         <div class="side-countdown">
             <h3>Dias até à próxima viagem</h3>
-            <div class="big-num">—</div>
-            <p>Sem viagem agendada</p>
+            {% if dias_proxima is not None %}
+                <div class="big-num">{{ dias_proxima }}</div>
+                <p>{{ proxima_viagem.titulo }} · {{ proxima_viagem.data_viagem|date:"d/m/Y" }}</p>
+            {% else %}
+                <div class="big-num">—</div>
+                <p>Sem viagem agendada</p>
+            {% endif %}
         </div>
     </div>
 
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function filtrarContinente(cont, btn) {
+    document.querySelectorAll('.filtro-cont').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.exemplo-card').forEach(card => {
+        card.style.display = (cont === 'todos' || card.dataset.continente === cont) ? '' : 'none';
+    });
+}
+</script>
 {% endblock %}
