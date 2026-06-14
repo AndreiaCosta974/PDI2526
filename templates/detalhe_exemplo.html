@@ -75,35 +75,49 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const locais = {{ locais_json|safe }};
-const mapa = L.map('mapa-roteiro').setView([39.7, -8.0], 6);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap'
-}).addTo(mapa);
 
-if (locais.length > 0) {
-    const cores = ['#2a7c6f','#3b82f6','#f97316','#a855f7','#ef4444'];
-    const bounds = [];
-    locais.forEach(l => {
-        const icon = L.divIcon({
-            className: '',
-            html: `<div style="background:${cores[(l.dia-1) % cores.length]};color:#fff;
-                       width:28px;height:28px;border-radius:50%;display:flex;
-                       align-items:center;justify-content:center;font-weight:700;
-                       font-size:.72rem;box-shadow:0 2px 6px rgba(0,0,0,.35);
-                       border:2px solid #fff">${l.dia}</div>`,
-            iconSize: [28,28], iconAnchor: [14,14]
+function iniciarMapa() {
+    const mapa = L.map('mapa-roteiro').setView([39.7, -8.0], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+    }).addTo(mapa);
+
+    if (locais.length > 0) {
+        const cores = ['#2a7c6f','#3b82f6','#f97316','#a855f7','#ef4444'];
+        const bounds = [];
+        locais.forEach(l => {
+            const icon = L.divIcon({
+                className: '',
+                html: `<div style="background:${cores[(l.dia-1) % cores.length]};color:#fff;
+                           width:28px;height:28px;border-radius:50%;display:flex;
+                           align-items:center;justify-content:center;font-weight:700;
+                           font-size:.72rem;box-shadow:0 2px 6px rgba(0,0,0,.35);
+                           border:2px solid #fff">${l.dia}</div>`,
+                iconSize: [28,28], iconAnchor: [14,14]
+            });
+            L.marker([l.lat, l.lng], {icon})
+             .addTo(mapa)
+             .bindPopup(`<b>${l.nome}</b><br><small>Dia ${l.dia}</small>`);
+            bounds.push([l.lat, l.lng]);
         });
-        L.marker([l.lat, l.lng], {icon})
-         .addTo(mapa)
-         .bindPopup(`<b>${l.nome}</b><br><small>Dia ${l.dia}</small>`);
-        bounds.push([l.lat, l.lng]);
-    });
-    mapa.fitBounds(bounds, {padding: [30,30]});
-    if (locais.length > 1) {
-        L.polyline(locais.map(l => [l.lat, l.lng]), {
-            color: '#2a7c6f', weight: 3, dashArray: '6,5', opacity: .75
-        }).addTo(mapa);
+        if (locais.length > 1) {
+            L.polyline(locais.map(l => [l.lat, l.lng]), {
+                color: '#2a7c6f', weight: 3, dashArray: '6,5', opacity: .75
+            }).addTo(mapa);
+        }
+        // Recalcula o tamanho do contentor antes de enquadrar os marcadores.
+        // Sem isto o mapa fica em branco quando ainda não tinha dimensões.
+        setTimeout(() => {
+            mapa.invalidateSize();
+            mapa.fitBounds(bounds, {padding: [30,30]});
+        }, 200);
     }
+}
+
+if (document.readyState === 'loading') {
+    window.addEventListener('load', iniciarMapa);
+} else {
+    iniciarMapa();
 }
 </script>
 {% endblock %}

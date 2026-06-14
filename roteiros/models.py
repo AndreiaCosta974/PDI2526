@@ -7,11 +7,21 @@ class Roteiro(models.Model):
     descricao = models.TextField(blank=True)
     data_viagem = models.DateField(null=True, blank=True)
     publico = models.BooleanField(default=False)
+    concluida = models.BooleanField(default=False)
     data_criacao = models.DateTimeField(auto_now_add=True)
     data_atualizacao = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.titulo
+
+    @property
+    def ja_feita(self):
+        """Considera a viagem feita se foi marcada como concluída
+        ou se a data de viagem já passou."""
+        from datetime import date
+        if self.concluida:
+            return True
+        return bool(self.data_viagem and self.data_viagem < date.today())
 
 class Dia(models.Model):
     roteiro = models.ForeignKey(Roteiro, on_delete=models.CASCADE, related_name='dias')

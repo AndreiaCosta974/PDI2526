@@ -63,6 +63,14 @@
         <a href="{% url 'editar_roteiro' roteiro.pk %}" class="btn-outline">✏️ Editar Roteiro</a>
         <a href="{% url 'mapa' %}?roteiro={{ roteiro.pk }}" class="btn-primary">🗺️ Ver no Mapa</a>
         <button class="btn-outline" id="btnPDF" onclick="exportarPDF()">📄 Exportar PDF</button>
+        <form method="post" action="{% url 'marcar_concluida' roteiro.pk %}" style="display:inline;">
+            {% csrf_token %}
+            {% if roteiro.concluida %}
+                <button type="submit" class="btn-outline" style="color:var(--green-dark); border-color:var(--green);">✓ Viagem concluída</button>
+            {% else %}
+                <button type="submit" class="btn-outline">✅ Marcar como concluída</button>
+            {% endif %}
+        </form>
         <a href="{% url 'eliminar_roteiro' roteiro.pk %}" class="btn-danger">🗑️ Eliminar</a>
     </div>
 

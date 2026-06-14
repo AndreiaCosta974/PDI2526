@@ -63,6 +63,19 @@ def editar_roteiro(request, pk):
 
 
 @login_required
+def marcar_concluida(request, pk):
+    roteiro = get_object_or_404(Roteiro, pk=pk, utilizador=request.user)
+    if request.method == 'POST':
+        roteiro.concluida = not roteiro.concluida
+        roteiro.save(update_fields=['concluida'])
+        if roteiro.concluida:
+            messages.success(request, 'Viagem marcada como concluída!')
+        else:
+            messages.info(request, 'Viagem desmarcada como concluída.')
+    return redirect('detalhe_roteiro', pk=pk)
+
+
+@login_required
 def eliminar_roteiro(request, pk):
     roteiro = get_object_or_404(Roteiro, pk=pk, utilizador=request.user)
     if request.method == 'POST':

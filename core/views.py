@@ -4,6 +4,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib import messages
 from roteiros.models import Roteiro, Local, Dia
 from django.conf import settings
+from django.db.models import Q
 from datetime import date
 import json
 
@@ -1129,12 +1130,18 @@ def dashboard(request):
     )
     dias_proxima = (proxima.data_viagem - hoje).days if proxima else None
 
+    # Viagens já realizadas: data de viagem no passado OU marcadas como concluídas
+    viagens_feitas = roteiros.filter(
+        Q(data_viagem__lt=hoje) | Q(concluida=True)
+    ).distinct().count()
+
     return render(request, 'dashboard.html', {
         'roteiros': roteiros,
         'total_locais': total_locais if total_locais > 0 else '—',
         'total_dias': total_dias if total_dias > 0 else '—',
         'proxima_viagem': proxima,
         'dias_proxima': dias_proxima,
+        'viagens_feitas': viagens_feitas,
         'roteiros_exemplo': [
             {**r, 'total_locais': _total_locais(r), 'continente': CONTINENTES.get(r['slug'], 'Outros')}
             for r in ROTEIROS_EXEMPLO

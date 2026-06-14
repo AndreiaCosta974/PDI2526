@@ -133,6 +133,20 @@
     font-family: var(--font-display); line-height: 1;
 }
 .side-countdown p { font-size: .75rem; opacity: .55; margin-top: .5rem; }
+.side-stat {
+    display: flex; align-items: center; gap: .8rem;
+    background: rgba(0,0,0,.2);
+    border-radius: var(--radius-lg);
+    padding: 1rem 1.1rem; color: #fff; margin-top: .4rem;
+}
+.side-stat .stat-num {
+    font-size: 1.9rem; font-weight: 700;
+    font-family: var(--font-display); line-height: 1;
+}
+.side-stat .stat-label {
+    font-size: .72rem; text-transform: uppercase;
+    letter-spacing: .06em; opacity: .65; font-weight: 600;
+}
 
 /* Roteiros de Exemplo */
 .exemplo-section { margin-top: 2.5rem; }
@@ -298,6 +312,13 @@
                 <div class="big-num">—</div>
                 <p>Sem viagem agendada</p>
             {% endif %}
+        </div>
+
+        <div class="side-stat">
+            <div class="stat-num">{{ viagens_feitas }}</div>
+            <div class="stat-label">
+                {% if viagens_feitas == 1 %}Viagem já feita{% else %}Viagens já feitas{% endif %}
+            </div>
         </div>
     </div>
 
